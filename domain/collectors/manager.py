@@ -69,6 +69,94 @@ class CollectorManager:
         
         return events
     
+    def collect_since_last_commit(self) -> List[Event]:
+        """Collect events since last commit (or last 24 hours as fallback)"""
+        import time
+        
+        now_ms = int(time.time() * 1000)
+        
+        # Always use last commit time first, then fallback to 24 hours  
+        last_commit_time = self.store.get_last_commit_time(self.repo_root)
+        if last_commit_time:
+            start_time = last_commit_time
+            if os.getenv('SAYU_DEBUG'):
+                from datetime import datetime
+                dt = datetime.fromtimestamp(last_commit_time / 1000)
+                print(f"Using last commit time: {dt.strftime('%m-%d %H:%M:%S')}")
+        else:
+            # Fallback to 24 hours if no commits found
+            start_time = now_ms - (24 * 60 * 60 * 1000)
+            if os.getenv('SAYU_DEBUG'):
+                print("No commit history found, using 24 hours fallback")
+        
+        all_events = []
+        
+        # Collect Git events
+        try:
+            git_events = self.git_collector.pull_since(start_time, now_ms, self.config)
+            all_events.extend(git_events)
+        except Exception as e:
+            if os.getenv('SAYU_DEBUG'):
+                print(f"Git collector error: {e}")
+
+        # Collect CLI events (if enabled)
+        if self.config.connectors.get('cli', {}).get('mode') != 'off':
+            try:
+                cli_events = self.cli_collector.pull_since(start_time, now_ms, self.config)
+                all_events.extend(cli_events)
+            except Exception as e:
+                if os.getenv('SAYU_DEBUG'):
+                    print(f"CLI collector error: {e}")
+        
+        # Collect Cursor events (if enabled)
+        cursor_enabled = self.config.connectors.get('cursor', False)
+        if os.getenv('SAYU_DEBUG'):
+            print(f"Cursor enabled: {cursor_enabled}")
+
+        if cursor_enabled:
+            try:
+                if os.getenv('SAYU_DEBUG'):
+                    print(f"Cursor time range: {start_time} to {now_ms}")
+                cursor_events = self.cursor_collector.pull_since(start_time, now_ms, self.config)
+                if os.getenv('SAYU_DEBUG'):
+                    print(f"Cursor events collected: {len(cursor_events)}")
+                    if cursor_events:
+                        print(f"Sample Cursor event: {cursor_events[0].text[:50]}")
+                all_events.extend(cursor_events)
+            except Exception as e:
+                if os.getenv('SAYU_DEBUG'):
+                    print(f"Cursor collector error: {e}")
+                    import traceback
+                    traceback.print_exc()
+
+        # Collect Claude events (if enabled)
+        claude_enabled = self.config.connectors.get('claude', False)
+        if os.getenv('SAYU_DEBUG'):
+            print(f"Claude enabled: {claude_enabled}")
+
+        if claude_enabled:
+            try:
+                if os.getenv('SAYU_DEBUG'):
+                    print(f"Claude time range: {start_time} to {now_ms}")
+                claude_events = self.claude_collector.pull_since(start_time, now_ms, self.config)
+                if os.getenv('SAYU_DEBUG'):
+                    print(f"Claude events collected: {len(claude_events)}")
+                    if claude_events:
+                        print(f"Sample Claude event: {claude_events[0].text[:50]}")
+                all_events.extend(claude_events)
+            except Exception as e:
+                if os.getenv('SAYU_DEBUG'):
+                    print(f"Claude collector error: {e}")
+                    import traceback
+                    traceback.print_exc()
+        
+        # Store events in database
+        if all_events:
+            self.store.insert_batch(all_events)
+
+        # Query all events within time window from DB (sorted by time)
+        return self.store.find_by_repo(self.repo_root, start_time, now_ms)
+
     def collect_in_time_window(self, hours: int = 168) -> List[Event]:
         """Collect events within time window (default: 1 week)"""
         import time

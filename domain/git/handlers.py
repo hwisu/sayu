@@ -57,8 +57,8 @@ class HookHandlers:
                 # Initialize collector manager
                 collector_manager = CollectorManager(repo_root)
                 
-                # Collect recent events (LLM conversations, CLI commands, etc.)
-                recent_events = collector_manager.collect_in_time_window(hours=24)
+                # Collect events since last commit (optimized range)
+                recent_events = collector_manager.collect_since_last_commit()
                 
                 # Filter for LLM events (conversations)
                 llm_events = [e for e in recent_events if e.source in [EventSource.LLM]]
@@ -187,9 +187,9 @@ class HookHandlers:
                 # Initialize collector manager
                 collector_manager = CollectorManager(repo_root)
                 
-                # Collect recent events
-                print(f"\n🔍 Collecting events from last 24 hours...")
-                recent_events = collector_manager.collect_in_time_window(hours=24)
+                # Collect events since last commit
+                print(f"\n🔍 Collecting events since last commit...")
+                recent_events = collector_manager.collect_since_last_commit()
                 
                 print(f"Found {len(recent_events)} total events")
                 
