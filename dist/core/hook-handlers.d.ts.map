@@ -1,1 +1,0 @@
-{"version":3,"file":"hook-handlers.d.ts","sourceRoot":"","sources":["../../src/core/hook-handlers.ts"],"names":[],"mappings":"AAMA,qBAAa,YAAY;WAEV,eAAe,CAAC,aAAa,EAAE,MAAM,GAAG,OAAO,CAAC,IAAI,CAAC;WA0CrD,gBAAgB,IAAI,OAAO,CAAC,IAAI,CAAC;IAiB9C,OAAO,CAAC,MAAM,CAAC,qBAAqB;IAkDpC,OAAO,CAAC,MAAM,CAAC,UAAU;CAS1B"}

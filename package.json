@@ -1,7 +1,7 @@
 {
   "name": "sayu",
   "version": "0.1.0",
-  "description": "커밋에 '왜'를 남기는 개인 로컬 블랙박스",
+  "description": "AI가 커밋 컨텍스트를 자동으로 기록합니다",
   "main": "dist/index.js",
   "bin": {
     "sayu": "./dist/cli/index.js"
@@ -13,26 +13,52 @@
     "lint": "eslint src/**/*.ts",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["git", "commit", "context", "llm", "automation"],
-  "author": "",
+  "keywords": [
+    "git",
+    "commit",
+    "context",
+    "llm",
+    "automation",
+    "ai",
+    "development",
+    "workflow"
+  ],
+  "author": "hwisookim",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hwisookim/sayu.git"
+  },
+  "homepage": "https://github.com/hwisookim/sayu",
+  "bugs": {
+    "url": "https://github.com/hwisookim/sayu/issues"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "better-sqlite3": "^9.2.2",
-    "commander": "^11.1.0",
-    "js-yaml": "^4.1.0",
-    "zod": "^3.22.4",
     "chalk": "^5.3.0",
-    "simple-git": "^3.21.0"
+    "commander": "^11.1.0",
+    "dotenv": "^17.2.2",
+    "js-yaml": "^4.1.0",
+    "simple-git": "^3.21.0",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",
+    "@types/jest": "^29.5.11",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.10.6",
     "@typescript-eslint/eslint-plugin": "^6.17.0",
     "@typescript-eslint/parser": "^6.17.0",
     "eslint": "^8.56.0",
     "jest": "^29.7.0",
-    "@types/jest": "^29.5.11",
     "ts-jest": "^29.1.1",
     "typescript": "^5.3.3"
   }

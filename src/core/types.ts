@@ -7,7 +7,7 @@ export type EventSource = z.infer<typeof EventSource>;
 // 이벤트 종류
 export const EventKind = z.enum([
   'chat', 'edit', 'save', 'run', 'nav', 'commit', 
-  'test', 'bench', 'error', 'doc'
+  'test', 'bench', 'error', 'doc', 'note', 'config'
 ]);
 export type EventKind = z.infer<typeof EventKind>;
 
@@ -35,7 +35,7 @@ export const Event = z.object({
   actor: Actor.nullable(),
   text: z.string(),
   url: z.string().nullable(),
-  meta: z.record(z.any()).default({})
+  meta: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).default({})
 });
 export type Event = z.infer<typeof Event>;
 
@@ -53,7 +53,7 @@ export const ConnectorConfig = z.object({
 });
 
 export const WindowConfig = z.object({
-  beforeCommitHours: z.number().default(24)
+  beforeCommitHours: z.number().default(168) // 일주일 (금요일→월요일 등 고려)
 });
 
 export const FilterConfig = z.object({
@@ -71,9 +71,8 @@ export const FilterConfig = z.object({
 export const SummarizerConfig = z.object({
   mode: z.enum(['rules', 'llm', 'hybrid']).default('hybrid'),
   maxLines: z.object({
-    commit: z.number().default(12),
-    notes: z.number().default(25)
-  }).default({ commit: 12, notes: 25 })
+    commit: z.number().default(12)
+  }).default({ commit: 12 })
 });
 
 export const PrivacyConfig = z.object({
@@ -85,9 +84,7 @@ export const PrivacyConfig = z.object({
 });
 
 export const OutputConfig = z.object({
-  commitTrailer: z.boolean().default(true),
-  gitNotes: z.boolean().default(true),
-  notesRef: z.string().default('refs/notes/sayu')
+  commitTrailer: z.boolean().default(true)
 });
 
 export const Config = z.object({
@@ -107,4 +104,36 @@ export interface Connector {
   pullSince(sinceMs: number, untilMs: number, cfg: Config): Promise<Event[]>;
   health(): Promise<{ ok: boolean; reason?: string }>;
   redact?(event: Event, cfg: Config): Event;
+}
+
+// Database row types
+export interface EventRow {
+  id: string;
+  ts: number;
+  source: string;
+  kind: string;
+  repo: string;
+  cwd: string;
+  file: string | null;
+  range: string | null;
+  range_start?: number | null;
+  range_end?: number | null;
+  actor: string | null;
+  text: string;
+  url: string | null;
+  meta: string | null;
+}
+
+// LLM Summary types
+export interface LLMSummaryResponse {
+  intent?: string;
+  changes?: string;
+  context?: string;
+}
+
+// User Config type (simplified)
+export interface UserConfig {
+  enabled: boolean;
+  language: 'ko' | 'en';
+  commitTrailer: boolean;
 }

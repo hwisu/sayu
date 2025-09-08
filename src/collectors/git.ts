@@ -23,6 +23,7 @@ export class GitCollector implements Connector {
   }
 
   async pullSince(sinceMs: number, untilMs: number, cfg: Config): Promise<Event[]> {
+    // Git collector는 이제 커밋만 저장 (편집 이벤트 제외)
     const events: Event[] = [];
     
     try {
@@ -37,7 +38,7 @@ export class GitCollector implements Connector {
       });
 
       for (const commit of log.all) {
-        // 커밋 이벤트
+        // 커밋 이벤트만 저장
         events.push({
           id: randomUUID(),
           ts: new Date(commit.date).getTime(),
@@ -57,56 +58,12 @@ export class GitCollector implements Connector {
             refs: commit.refs
           }
         });
-
-        // 변경된 파일들
-        const diff = await this.git.show([commit.hash, '--name-status']);
-        const fileChanges = this.parseFileChanges(diff);
         
-        for (const change of fileChanges) {
-          events.push({
-            id: randomUUID(),
-            ts: new Date(commit.date).getTime(),
-            source: 'git',
-            kind: 'edit',
-            repo: this.repoRoot,
-            cwd: this.repoRoot,
-            file: change.file,
-            range: null,
-            actor: 'user',
-            text: `${change.status} ${change.file}`,
-            url: null,
-            meta: {
-              commitHash: commit.hash,
-              changeType: change.status,
-              additions: change.additions,
-              deletions: change.deletions
-            }
-          });
-        }
+        // 파일 변경 이벤트는 더 이상 저장하지 않음
+        // 필요시 커밋 메타데이터에서 확인 가능
       }
 
-      // 현재 스테이징된 변경사항
-      const status = await this.git.status();
-      const currentTime = Date.now();
-
-      for (const file of status.staged) {
-        events.push({
-          id: randomUUID(),
-          ts: currentTime,
-          source: 'git',
-          kind: 'edit',
-          repo: this.repoRoot,
-          cwd: this.repoRoot,
-          file: file,
-          range: null,
-          actor: 'user',
-          text: `Staged: ${file}`,
-          url: null,
-          meta: {
-            staged: true
-          }
-        });
-      }
+      // 편집 이벤트 저장 제거
 
     } catch (error) {
       console.error('GitCollector error:', error);

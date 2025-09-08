@@ -1,6 +1,5 @@
 import Database, { Database as DatabaseType } from 'better-sqlite3';
-import { Event } from './types';
-import { randomUUID } from 'crypto';
+import { Event, EventRow, EventSource, EventKind, Actor } from './types';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
@@ -135,18 +134,44 @@ export class EventStore {
   }
 
   findByTimeRange(startMs: number, endMs: number): Event[] {
-    const rows = this.searchByTimeStmt.all(startMs, endMs) as any[];
+    const rows = this.searchByTimeStmt.all(startMs, endMs) as EventRow[];
     return rows.map(this.rowToEvent);
   }
 
   findByFile(file: string, startMs: number, endMs: number): Event[] {
-    const rows = this.searchByFileStmt.all(file, startMs, endMs) as any[];
+    const rows = this.searchByFileStmt.all(file, startMs, endMs) as EventRow[];
     return rows.map(this.rowToEvent);
   }
 
   findByRepo(repo: string, startMs: number, endMs: number): Event[] {
-    const rows = this.searchByRepoStmt.all(repo, startMs, endMs) as any[];
+    const rows = this.searchByRepoStmt.all(repo, startMs, endMs) as EventRow[];
     return rows.map(this.rowToEvent);
+  }
+
+  // 마지막 커밋 시간 가져오기
+  getLastCommitTime(repo: string): number | null {
+    const stmt = this.db.prepare(`
+      SELECT ts FROM events 
+      WHERE repo = ? AND source = 'git' AND kind = 'commit'
+      ORDER BY ts DESC
+      LIMIT 1
+    `);
+    
+    const row = stmt.get(repo) as { ts: number } | undefined;
+    return row ? row.ts : null;
+  }
+
+  // 마지막 커밋 이벤트 가져오기
+  findLastCommit(repo: string): Event | null {
+    const stmt = this.db.prepare(`
+      SELECT * FROM events 
+      WHERE repo = ? AND source = 'git' AND kind = 'commit'
+      ORDER BY ts DESC
+      LIMIT 1
+    `);
+    
+    const row = stmt.get(repo) as EventRow | undefined;
+    return row ? this.rowToEvent(row) : null;
   }
 
   searchText(query: string, limit: number = 100): Event[] {
@@ -158,37 +183,27 @@ export class EventStore {
       LIMIT ?
     `);
     
-    const rows = stmt.all(query, limit) as any[];
+    const rows = stmt.all(query, limit) as EventRow[];
     return rows.map(this.rowToEvent);
   }
 
-  private rowToEvent(row: any): Event {
+  private rowToEvent(row: EventRow): Event {
     return {
       id: row.id,
       ts: row.ts,
-      source: row.source,
-      kind: row.kind,
+      source: row.source as EventSource,
+      kind: row.kind as EventKind,
       repo: row.repo,
       cwd: row.cwd,
       file: row.file,
       range: row.range_start && row.range_end 
         ? { start: row.range_start, end: row.range_end }
         : null,
-      actor: row.actor,
+      actor: row.actor as Actor | null,
       text: row.text,
       url: row.url,
       meta: JSON.parse(row.meta || '{}')
     };
-  }
-
-  getLastCommitTime(repo: string): number | null {
-    const stmt = this.db.prepare(`
-      SELECT MAX(ts) as last_ts FROM events 
-      WHERE repo = ? AND kind = 'commit'
-    `);
-    
-    const row = stmt.get(repo) as any;
-    return row?.last_ts || null;
   }
 
   close(): void {
