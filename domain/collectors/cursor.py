@@ -138,86 +138,171 @@ class CursorCollector:
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             
-            # Get composer data
+            # Extract actual message content from aiService.generations
             cursor.execute(
-                "SELECT value FROM ItemTable WHERE key = 'composer.composerData'"
+                "SELECT value FROM ItemTable WHERE key = 'aiService.generations'"
             )
-            result = cursor.fetchone()
+            generations_result = cursor.fetchone()
             
-            if not result:
-                conn.close()
-                return events
-            
-            composer_data = json.loads(result[0])
-            all_composers = composer_data.get('allComposers', [])
-            
-            for composer in all_composers:
+            if generations_result:
                 try:
-                    # Extract timing information
-                    created_at = composer.get('createdAt')
-                    updated_at = composer.get('lastUpdatedAt')
+                    generations_data = json.loads(generations_result[0])
                     
-                    if not created_at:
-                        continue
-                    
-                    # Check if conversation was created or updated within time range
-                    in_creation_range = since_ms <= created_at <= until_ms
-                    in_update_range = updated_at and since_ms <= updated_at <= until_ms
-                    
-                    if not (in_creation_range or in_update_range):
-                        continue
-                    
-                    # Create event for conversation start
-                    start_event = Event(
-                        id=str(uuid.uuid4()),
-                        ts=created_at,
-                        source=EventSource.LLM,
-                        kind=EventKind.CHAT,
-                        repo=self.repo_root,
-                        cwd=self.repo_root,
-                        file=None,
-                        range=None,
-                        actor=Actor.USER,
-                        text=f"Started Cursor conversation: {composer.get('name', 'Untitled')}",
-                        url=None,
-                        meta={
-                            'composerId': composer.get('composerId'),
-                            'type': 'conversation_start',
-                            'mode': composer.get('unifiedMode'),
-                            'forceMode': composer.get('forceMode'),
-                            'tool': 'cursor'
-                        }
-                    )
-                    events.append(start_event)
-                    
-                    # If conversation was updated, create update event
-                    if updated_at and updated_at != created_at and updated_at <= until_ms:
-                        update_event = Event(
-                            id=str(uuid.uuid4()),
-                            ts=updated_at,
-                            source=EventSource.LLM,
-                            kind=EventKind.CHAT,
-                            repo=self.repo_root,
-                            cwd=self.repo_root,
-                            file=None,
-                            range=None,
-                            actor=Actor.ASSISTANT,
-                            text=f"Cursor conversation updated: {composer.get('name', 'Untitled')}",
-                            url=None,
-                            meta={
-                                'composerId': composer.get('composerId'),
-                                'type': 'conversation_update',
-                                'mode': composer.get('unifiedMode'),
-                                'duration': updated_at - created_at,
-                                'tool': 'cursor'
-                            }
-                        )
-                        events.append(update_event)
-                        
-                except Exception as e:
+                    for gen in generations_data:
+                        try:
+                            timestamp = gen.get('unixMs')
+                            text_desc = gen.get('textDescription', '')
+                            gen_uuid = gen.get('generationUUID', '')
+                            gen_type = gen.get('type', 'unknown')
+                            
+                            if not timestamp or not text_desc:
+                                continue
+                            
+                            # Check if within time range
+                            if not (since_ms <= timestamp <= until_ms):
+                                continue
+                            
+                            # Create event for user message
+                            user_event = Event(
+                                id=str(uuid.uuid4()),
+                                ts=timestamp,
+                                source=EventSource.LLM,
+                                kind=EventKind.CHAT,
+                                repo=self.repo_root,
+                                cwd=self.repo_root,
+                                file=None,
+                                range=None,
+                                actor=Actor.USER,
+                                text=text_desc,
+                                url=None,
+                                meta={
+                                    'generationUUID': gen_uuid,
+                                    'type': gen_type,
+                                    'tool': 'cursor',
+                                    'source_table': 'aiService.generations'
+                                }
+                            )
+                            events.append(user_event)
+                            
+                        except Exception as e:
+                            if os.getenv('SAYU_DEBUG'):
+                                print(f"Error processing generation {gen}: {e}")
+                            continue
+                            
+                except json.JSONDecodeError as e:
                     if os.getenv('SAYU_DEBUG'):
-                        print(f"Error processing composer {composer}: {e}")
-                    continue
+                        print(f"Error parsing aiService.generations: {e}")
+            
+            # Extract AI responses from aiService.prompts (timestamp 없는 경우 대응)
+            cursor.execute(
+                "SELECT value FROM ItemTable WHERE key = 'aiService.prompts'"
+            )
+            prompts_result = cursor.fetchone()
+            
+            if prompts_result:
+                try:
+                    prompts_data = json.loads(prompts_result[0])
+                    
+                    # Handle both list and dict formats
+                    prompt_items = prompts_data if isinstance(prompts_data, list) else prompts_data.values()
+                    
+                    # 시간 범위 내의 사용자 메시지들과 AI 응답 매칭
+                    user_events_in_range = [e for e in events if e.actor == Actor.USER and since_ms <= e.ts <= until_ms]
+                    
+                    # AI 응답 중에서 의미있는 것들만 필터링
+                    meaningful_ai_responses = []
+                    for prompt in prompt_items:
+                        if not isinstance(prompt, dict):
+                            continue
+                        
+                        text_content = prompt.get('text', '')
+                        command_type = prompt.get('commandType', '')
+                        
+                        if not text_content or len(text_content.strip()) < 10:
+                            continue
+                        
+                        # 의미있는 AI 응답만 필터링 (툴 사용, 간단 출력 제외)
+                        is_meaningful_ai_response = (
+                            len(text_content) > 300 and  # 적당한 길이 이상
+                            not text_content.startswith('For the code present') and  # 에러 메시지 제외
+                            not text_content.startswith('Cannot find') and  # 에러 메시지 제외
+                            not text_content.startswith('Type \'') and  # 타입 에러 제외
+                            not text_content.startswith('Argument of type') and  # 타입 에러 제외
+                            not text_content.startswith('[HMR]') and  # 개발 로그 제외
+                            not text_content.startswith('bootstrap:') and  # 개발 로그 제외
+                            not text_content.startswith('Request URL') and  # 네트워크 로그 제외
+                            not text_content.startswith('HTTP/1.1') and  # 네트워크 로그 제외
+                            not text_content.startswith('Run ') and  # 명령어 실행 로그 제외
+                            not '에러:' in text_content and  # 에러 관련 제외
+                            not 'Error:' in text_content and  # 에러 관련 제외
+                            (
+                                'AI-Context' in text_content or  # 구조화된 AI 응답
+                                text_content.startswith('아래는') or  # AI 설명 패턴  
+                                'PRD' in text_content or  # 문서 생성
+                                text_content.count('\n') > 3 or  # 여러 줄의 설명
+                                len(text_content) > 800  # 충분히 긴 응답
+                            )
+                        )
+                        
+                        if is_meaningful_ai_response:
+                            meaningful_ai_responses.append({
+                                'text': text_content,
+                                'commandType': command_type
+                            })
+                    
+                    # 사용자 메시지 개수와 AI 응답 개수 매칭
+                    num_user_messages = len(user_events_in_range)
+                    num_ai_responses = min(len(meaningful_ai_responses), num_user_messages * 2)  # 최대 사용자 메시지의 2배
+                    
+                    if os.getenv('SAYU_DEBUG'):
+                        print(f'매칭: 사용자 메시지 {num_user_messages}개, AI 응답 {num_ai_responses}개')
+                    
+                    # AI 응답들을 사용자 메시지 이후 시간으로 배치
+                    for i, ai_response in enumerate(meaningful_ai_responses[:num_ai_responses]):
+                        try:
+                            # 해당하는 사용자 메시지의 시간 기준으로 AI 응답 시간 설정
+                            user_idx = min(i // 2, len(user_events_in_range) - 1)  # 사용자 메시지 인덱스
+                            base_timestamp = user_events_in_range[user_idx].ts
+                            
+                            # AI 응답은 사용자 메시지 30초~3분 후에 생성된다고 가정
+                            ai_timestamp = base_timestamp + 30000 + (i % 2) * 60000  # 30초, 1분30초 후
+                            
+                            # 시간 범위 체크
+                            if ai_timestamp > until_ms:
+                                continue
+                            
+                            # Create event for AI response  
+                            ai_event = Event(
+                                id=str(uuid.uuid4()),
+                                ts=ai_timestamp,
+                                source=EventSource.LLM,
+                                kind=EventKind.CHAT,
+                                repo=self.repo_root,
+                                cwd=self.repo_root,
+                                file=None,
+                                range=None,
+                                actor=Actor.ASSISTANT,
+                                text=ai_response['text'][:1500],  # 적당한 길이로 제한
+                                url=None,
+                                meta={
+                                    'type': 'ai_response',
+                                    'commandType': ai_response['commandType'],
+                                    'tool': 'cursor',
+                                    'source_table': 'aiService.prompts',
+                                    'inferred_timestamp': True,
+                                    'paired_with_user_msg': user_idx
+                                }
+                            )
+                            events.append(ai_event)
+                            
+                        except Exception as e:
+                            if os.getenv('SAYU_DEBUG'):
+                                print(f"Error processing prompt {prompt}: {e}")
+                            continue
+                            
+                except json.JSONDecodeError as e:
+                    if os.getenv('SAYU_DEBUG'):
+                        print(f"Error parsing aiService.prompts: {e}")
             
             conn.close()
             
