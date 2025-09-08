@@ -131,9 +131,15 @@ def health():
                 print(f"✅ Cursor connected ({cursor_info.get('conversations', 0)} conversations)")
             else:
                 print(f"⚠️  Cursor: {collector_health['cursor']['reason']}")
+
+            if collector_health['claude']['ok']:
+                claude_info = collector_health['claude']
+                print(f"✅ Claude connected ({claude_info.get('conversations', 0)} conversations)")
+            else:
+                print(f"⚠️  Claude: {collector_health['claude']['reason']}")
                 
         except Exception as e:
-            print(f"⚠️  Cursor collector error: {e}")
+            print(f"⚠️  Collector error: {e}")
         
         # Check API keys
         available_apis = LLMApiClient.get_available_apis()

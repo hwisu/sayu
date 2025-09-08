@@ -10,6 +10,7 @@ from domain.git.hooks import GitHookManager
 from .git import GitCollector
 from .cli import CliCollector
 from .cursor import CursorCollector
+from .claude import ClaudeCollector
 
 
 class CollectorManager:
@@ -28,9 +29,8 @@ class CollectorManager:
         self.git_collector = GitCollector(self.repo_root)
         self.cli_collector = CliCollector(self.repo_root)
         self.cursor_collector = CursorCollector(self.repo_root)
+        self.claude_collector = ClaudeCollector(self.repo_root)
         
-        # TODO: Add remaining LLM collectors when implemented
-        # self.claude_collector = ClaudeCollector(self.repo_root)
     
     def collect_current_commit(self) -> List[Event]:
         """Collect events for currently staged changes"""
@@ -99,35 +99,47 @@ class CollectorManager:
                 if os.getenv('SAYU_DEBUG'):
                     print(f"CLI collector error: {e}")
         
-        # Collect Cursor events (if enabled)
-        cursor_enabled = self.config.connectors.get('cursor', False)
-        if os.getenv('SAYU_DEBUG'):
-            print(f"Cursor enabled: {cursor_enabled}")
-        
-        if cursor_enabled:
-            try:
-                if os.getenv('SAYU_DEBUG'):
-                    print(f"Cursor time range: {start_time} to {now_ms}")
-                cursor_events = self.cursor_collector.pull_since(start_time, now_ms, self.config)
-                if os.getenv('SAYU_DEBUG'):
-                    print(f"Cursor events collected: {len(cursor_events)}")
-                    if cursor_events:
-                        print(f"Sample Cursor event: {cursor_events[0].text[:50]}")
-                all_events.extend(cursor_events)
-            except Exception as e:
-                if os.getenv('SAYU_DEBUG'):
-                    print(f"Cursor collector error: {e}")
-                    import traceback
-                    traceback.print_exc()
-        
-        # TODO: Collect Claude events when collector is implemented
-        # if self.config.connectors.claude:
-        #     try:
-        #         claude_events = self.claude_collector.pull_since(start_time, now_ms, self.config)
-        #         all_events.extend(claude_events)
-        #     except Exception as e:
-        #         if os.getenv('SAYU_DEBUG'):
-        #             print(f"Claude collector error: {e}")
+            # Collect Cursor events (if enabled)
+            cursor_enabled = self.config.connectors.get('cursor', False)
+            if os.getenv('SAYU_DEBUG'):
+                print(f"Cursor enabled: {cursor_enabled}")
+
+            if cursor_enabled:
+                try:
+                    if os.getenv('SAYU_DEBUG'):
+                        print(f"Cursor time range: {start_time} to {now_ms}")
+                    cursor_events = self.cursor_collector.pull_since(start_time, now_ms, self.config)
+                    if os.getenv('SAYU_DEBUG'):
+                        print(f"Cursor events collected: {len(cursor_events)}")
+                        if cursor_events:
+                            print(f"Sample Cursor event: {cursor_events[0].text[:50]}")
+                    all_events.extend(cursor_events)
+                except Exception as e:
+                    if os.getenv('SAYU_DEBUG'):
+                        print(f"Cursor collector error: {e}")
+                        import traceback
+                        traceback.print_exc()
+
+            # Collect Claude events (if enabled)
+            claude_enabled = self.config.connectors.get('claude', False)
+            if os.getenv('SAYU_DEBUG'):
+                print(f"Claude enabled: {claude_enabled}")
+
+            if claude_enabled:
+                try:
+                    if os.getenv('SAYU_DEBUG'):
+                        print(f"Claude time range: {start_time} to {now_ms}")
+                    claude_events = self.claude_collector.pull_since(start_time, now_ms, self.config)
+                    if os.getenv('SAYU_DEBUG'):
+                        print(f"Claude events collected: {len(claude_events)}")
+                        if claude_events:
+                            print(f"Sample Claude event: {claude_events[0].text[:50]}")
+                    all_events.extend(claude_events)
+                except Exception as e:
+                    if os.getenv('SAYU_DEBUG'):
+                        print(f"Claude collector error: {e}")
+                        import traceback
+                        traceback.print_exc()
         
         # Store events in database
         if all_events:
@@ -141,11 +153,9 @@ class CollectorManager:
         health = {
             'git': self.git_collector.health(),
             'cli': self.cli_collector.health(),
-            'cursor': self.cursor_collector.health()
+            'cursor': self.cursor_collector.health(),
+            'claude': self.claude_collector.health()
         }
-        
-        # TODO: Add remaining LLM collector health checks
-        # health['claude'] = self.claude_collector.health()
         
         return health
     
