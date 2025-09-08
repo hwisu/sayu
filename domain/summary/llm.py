@@ -100,27 +100,39 @@ class LLMSummaryGenerator:
     
     @staticmethod
     def _wrap_text(text: str, indent: int = 0) -> str:
-        """Wrap text to specified line length with indentation"""
+        """Wrap text to specified line length with indentation, preserving original line breaks"""
         max_line_length = TextConstants.MAX_LINE_LENGTH
         indent_str = ' ' * indent
-        words = text.split(' ')
-        lines = []
-        current_line = indent_str
         
-        for word in words:
-            if len(current_line) + len(word) + 1 <= max_line_length:
-                if current_line == indent_str:
-                    current_line += word
+        # Split by original line breaks first to preserve LLM's intentional formatting
+        original_lines = text.split('\n')
+        final_lines = []
+        
+        for original_line in original_lines:
+            original_line = original_line.strip()
+            if not original_line:
+                # Preserve empty lines
+                final_lines.append('')
+                continue
+            
+            # Wrap each original line if it's too long
+            words = original_line.split(' ')
+            current_line = indent_str
+            
+            for word in words:
+                if len(current_line) + len(word) + 1 <= max_line_length:
+                    if current_line == indent_str:
+                        current_line += word
+                    else:
+                        current_line += ' ' + word
                 else:
-                    current_line += ' ' + word
-            else:
-                lines.append(current_line)
-                current_line = indent_str + word
+                    final_lines.append(current_line)
+                    current_line = indent_str + word
+            
+            if current_line.strip():
+                final_lines.append(current_line)
         
-        if current_line.strip():
-            lines.append(current_line)
-        
-        return '\n'.join(lines)
+        return '\n'.join(final_lines)
     
     @staticmethod
     def _format_raw_response(text: str) -> str:
