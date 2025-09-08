@@ -4,7 +4,7 @@ import json
 import re
 from typing import List, Dict, Any
 
-from events.types import Event, LLMSummaryResponse
+from domain.events.types import Event, LLMSummaryResponse
 from infra.api.llm import LLMApiClient
 from i18n import i18n
 from shared.constants import TextConstants
@@ -20,10 +20,12 @@ class LLMSummaryGenerator:
         response = LLMApiClient.call_llm(prompt)
         
         try:
-            parsed = json.loads(response)
+            # Try to extract JSON from markdown code blocks
+            json_content = LLMSummaryGenerator._extract_json_from_response(response)
+            parsed = json.loads(json_content)
             return LLMSummaryGenerator._format_commit_trailer(parsed)
-        except json.JSONDecodeError:
-            print('[Sayu] JSON parse failed, using raw response')
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f'[Sayu] JSON parse failed: {e}, using raw response')
             return LLMSummaryGenerator._format_raw_response(response)
     
     @staticmethod
@@ -42,10 +44,12 @@ class LLMSummaryGenerator:
         response = LLMApiClient.call_llm(simple_prompt)
         
         try:
-            parsed = json.loads(response)
+            # Try to extract JSON from markdown code blocks
+            json_content = LLMSummaryGenerator._extract_json_from_response(response)
+            parsed = json.loads(json_content)
             return LLMSummaryGenerator._format_commit_trailer(parsed)
-        except json.JSONDecodeError:
-            print('[Sayu] JSON parse failed, using raw response')
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f'[Sayu] JSON parse failed: {e}, using raw response')
             return LLMSummaryGenerator._format_raw_response(response)
     
     @staticmethod
@@ -198,3 +202,27 @@ class LLMSummaryGenerator:
             analysis.append(f"특이점: {', '.join(unusual_patterns)}")
         
         return ' / '.join(analysis)
+    
+    @staticmethod
+    def _extract_json_from_response(response: str) -> str:
+        """Extract JSON from response, handling markdown code blocks"""
+        # First try direct JSON parsing
+        response = response.strip()
+        if response.startswith('{') and response.endswith('}'):
+            return response
+        
+        # Try to extract from markdown code blocks
+        import re
+        
+        # Look for ```json ... ``` blocks
+        json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response, re.DOTALL)
+        if json_match:
+            return json_match.group(1).strip()
+        
+        # Look for { ... } blocks
+        json_match = re.search(r'(\{.*?\})', response, re.DOTALL)
+        if json_match:
+            return json_match.group(1).strip()
+        
+        # If no JSON found, raise error
+        raise ValueError(f"No JSON found in response: {response[:200]}...")

@@ -35,51 +35,6 @@ class LLMApiClient:
             'anthropic': bool(os.getenv('ANTHROPIC_API_KEY'))
         }
     
-    @classmethod
-    def generate_summary(
-        cls, 
-        repo_root: str, 
-        staged_files: List[str], 
-        diff_stats: Dict[str, Any], 
-        language: str = 'ko'
-    ) -> Optional[str]:
-        """Generate AI summary for commit context"""
-        try:
-            # Import i18n here to avoid circular imports
-            from i18n import i18n
-            
-            # Build prompt using i18n templates
-            i18n_manager = i18n()
-            i18n_manager.set_language(language)
-            
-            # Get file list string
-            files_str = ', '.join(staged_files[:10])
-            if len(staged_files) > 10:
-                files_str += f' and {len(staged_files) - 10} more files'
-            
-            # Create simple prompt for commit summary
-            prompt = f"""Analyze the following code changes and provide a brief summary in {language}:
-
-Files changed: {files_str}
-Changes: +{diff_stats['additions']} -{diff_stats['deletions']} lines
-
-Please provide a concise summary of what was changed and why, in {language}.
-Format the response as a brief description suitable for a git commit message trailer.
-"""
-            
-            # Call LLM
-            response = cls.call_llm(prompt)
-            
-            # Clean and validate response
-            if response and len(response.strip()) > 10:
-                return response.strip()
-            
-            return None
-            
-        except Exception as e:
-            if os.getenv('SAYU_DEBUG'):
-                print(f"Summary generation error: {e}")
-            return None
     
     @classmethod
     def _call_gemini(cls, prompt: str) -> str:

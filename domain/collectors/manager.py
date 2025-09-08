@@ -40,7 +40,7 @@ class CollectorManager:
         
         # Store diff information if available
         if git_context['diff']:
-            from events.types import Event, EventSource, EventKind, Actor
+            from domain.events.types import Event, EventSource, EventKind, Actor
             import uuid
             import time
             

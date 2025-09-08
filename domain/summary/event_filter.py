@@ -3,7 +3,7 @@
 import re
 from typing import List
 
-from events.types import Event
+from domain.events.types import Event
 from shared.constants import TextConstants
 
 

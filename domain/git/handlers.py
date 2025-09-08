@@ -45,18 +45,49 @@ class HookHandlers:
             
             diff_stats = CliUtils.get_diff_stats()
             
-            # Generate AI summary
+            # Generate AI summary using proper context collection
             try:
-                summary = LLMApiClient.generate_summary(
-                    repo_root=repo_root,
-                    staged_files=staged_files,
-                    diff_stats=diff_stats,
-                    language=config.language
-                )
+                # Import here to avoid circular imports
+                from domain.collectors.manager import CollectorManager
+                from domain.summary.llm import LLMSummaryGenerator
+                from domain.events.types import Event, EventSource, EventKind, Actor
+                import uuid
+                import time
+                
+                # Initialize collector manager
+                collector_manager = CollectorManager(repo_root)
+                
+                # Collect recent events (LLM conversations, CLI commands, etc.)
+                recent_events = collector_manager.collect_in_time_window(hours=24)
+                
+                # Filter for LLM events (conversations)
+                llm_events = [e for e in recent_events if e.source in [EventSource.LLM]]
+                
+                # Add current diff as context event
+                if diff_stats['stat_output']:
+                    diff_event = Event(
+                        id=str(uuid.uuid4()),
+                        ts=int(time.time() * 1000),
+                        source=EventSource.GIT,
+                        kind=EventKind.COMMIT,
+                        repo=repo_root,
+                        cwd=repo_root,
+                        actor=Actor.USER,
+                        text=diff_stats['stat_output'],
+                        meta={'type': 'diff_stats', 'files': staged_files}
+                    )
+                    llm_events.append(diff_event)
+                
+                # Generate structured summary
+                if llm_events:
+                    summary = LLMSummaryGenerator.generate(llm_events, staged_files, diff_stats['stat_output'])
+                else:
+                    # Fallback to simplified generation
+                    summary = LLMSummaryGenerator.generate_simplified([], staged_files, diff_stats['stat_output'])
                 
                 if summary and config.commitTrailer:
                     # Append AI context to commit message
-                    enhanced_msg = f"{original_msg.rstrip()}\n\n---\nAI-Context (sayu)\n{summary}\n---\n"
+                    enhanced_msg = f"{original_msg.rstrip()}\n\n{summary}\n"
                     
                     with open(msg_file, 'w') as f:
                         f.write(enhanced_msg)
@@ -141,17 +172,57 @@ class HookHandlers:
             
             print(f"\nChanges: +{diff_stats['additions']} -{diff_stats['deletions']}")
             
-            # Try to generate summary
+            # Try to generate summary using new system
             config_manager = ConfigManager(repo_root)
             config = config_manager.get_user_config()
             
             try:
-                summary = LLMApiClient.generate_summary(
-                    repo_root=repo_root,
-                    staged_files=staged_files,
-                    diff_stats=diff_stats,
-                    language=config.language
-                )
+                # Use new context collection system
+                from domain.collectors.manager import CollectorManager
+                from domain.summary.llm import LLMSummaryGenerator
+                from domain.events.types import Event, EventSource, EventKind, Actor
+                import uuid
+                import time
+                
+                # Initialize collector manager
+                collector_manager = CollectorManager(repo_root)
+                
+                # Collect recent events
+                print(f"\n🔍 Collecting events from last 24 hours...")
+                recent_events = collector_manager.collect_in_time_window(hours=24)
+                
+                print(f"Found {len(recent_events)} total events")
+                
+                # Filter for LLM events
+                llm_events = [e for e in recent_events if e.source in [EventSource.LLM]]
+                cli_events = [e for e in recent_events if e.source == EventSource.CLI]
+                git_events = [e for e in recent_events if e.source == EventSource.GIT]
+                
+                print(f"  - LLM events: {len(llm_events)}")
+                print(f"  - CLI events: {len(cli_events)}")
+                print(f"  - Git events: {len(git_events)}")
+                
+                # Add current diff as context
+                if diff_stats['stat_output']:
+                    diff_event = Event(
+                        id=str(uuid.uuid4()),
+                        ts=int(time.time() * 1000),
+                        source=EventSource.GIT,
+                        kind=EventKind.COMMIT,
+                        repo=repo_root,
+                        cwd=repo_root,
+                        actor=Actor.USER,
+                        text=diff_stats['stat_output'],
+                        meta={'type': 'diff_stats', 'files': staged_files}
+                    )
+                    llm_events.append(diff_event)
+                
+                # Generate structured summary
+                print(f"\n⚡ Generating AI context...")
+                if llm_events:
+                    summary = LLMSummaryGenerator.generate(llm_events, staged_files, diff_stats['stat_output'])
+                else:
+                    summary = LLMSummaryGenerator.generate_simplified([], staged_files, diff_stats['stat_output'])
                 
                 if summary:
                     print("\n--- AI Context Preview ---")
@@ -162,6 +233,9 @@ class HookHandlers:
                     
             except Exception as e:
                 print(f"\nFailed to generate AI context: {e}")
+                if os.getenv('SAYU_DEBUG'):
+                    import traceback
+                    traceback.print_exc()
                 
         except Exception as e:
             print(f"Preview error: {e}")
