@@ -3,7 +3,7 @@ import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { LLM_CONSTANTS } from './constants';
+import { LLM_CONSTANTS } from '../../shared/constants';
 
 const execAsync = promisify(exec);
 

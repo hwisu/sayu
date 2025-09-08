@@ -1,4 +1,4 @@
-import { EventStore } from './database';
+import { EventStore } from './store';
 
 /**
  * EventStore 싱글톤 매니저

@@ -1,61 +1,61 @@
-# 사유(Sayu) - 커밋에 '왜'를 남기는 개인 로컬 블랙박스
+# Sayu - AI-Powered Commit Context Tracker
 
-> "이 변경의 이유"를 LLM 대화 기록으로 자동 추적하는 Git 컨텍스트 수집 도구
+> Automatically capture the "why" behind your code changes using LLM conversation history
 
-## 🎯 목적
+## Purpose
 
-시간이 지나면 "왜 이런 변경을 했는지" 배경이 사라집니다. Sayu는 커밋 시점에 **Claude/Cursor LLM 대화 기록**을 자동으로 분석하여 변경의 **의도, 접근법, 맥락**을 구조화된 한글로 기록합니다.
+Over time, the reasoning behind code changes gets lost. Sayu automatically analyzes your **Claude/Cursor LLM conversations** at commit time to record the **intent, approach, and context** of your changes in structured Korean summaries.
 
-## ✨ 주요 기능
+## Key Features
 
-- **🤖 LLM 대화 수집**: Claude, Cursor의 실시간 대화 기록 자동 추출
-- **🧠 스마트 필터링**: 효용성 기반으로 중요한 대화만 선별 (93% 노이즈 제거)
-- **🇰🇷 한글 컨텍스트**: LLM이 한글로 의도/변경사항/접근법/맥락 분석
-- **🔍 대화 과정 분석**: 질문 패턴, 문제 해결 과정, 특이점 자동 감지
-- **🛡️ 빈 커밋 검증**: 의미없는 빈 커밋 차단, 설정 변경은 허용
-- **🔐 로컬 우선**: 모든 데이터는 로컬 저장 (프라이버시 보호)
-- **⚡ Fail-open**: 훅 실패가 커밋을 막지 않음
+- **🤖 LLM Conversation Collection**: Auto-extract Claude and Cursor conversation logs
+- **🧠 Smart Filtering**: Utility-based selection of important conversations (93% noise reduction)
+- **🇰🇷 Korean Context**: LLM analyzes intent/changes/approach/context in Korean
+- **🔍 Conversation Analysis**: Automatic detection of question patterns, problem-solving processes, and anomalies
+- **🛡️ Empty Commit Validation**: Blocks meaningless commits while allowing configuration changes
+- **🔐 Local-First**: All data stored locally (privacy protected)
+- **⚡ Fail-Open**: Hook failures don't block commits
 
-## 📦 설치
+## Installation
 
 ```bash
-# 의존성 설치
+# Install dependencies
 npm install
 
-# 빌드
+# Build the project
 npm run build
 
-# 레포지토리에 Sayu 초기화
+# Initialize Sayu in your repository
 node dist/cli/index.js init
 ```
 
-## 🚀 사용법
+## Usage
 
-### 초기화
+### Initialize
 ```bash
-# Git 레포지토리에서 실행
+# Run in your Git repository
 sayu init
 ```
 
-이 명령은:
-- `.sayu.yml` 설정 파일 생성
-- Git 훅 설치 (commit-msg, post-commit)
-- 로컬 SQLite 데이터베이스 초기화 (`~/.sayu/events.db`)
+This command:
+- Creates `.sayu.yml` configuration file
+- Installs Git hooks (commit-msg, post-commit)
+- Initializes local SQLite database (`~/.sayu/events.db`)
 
-### 상태 확인
+### Check Status
 ```bash
 sayu health
 ```
 
-### 커밋하기
-평소처럼 커밋하면 자동으로 LLM 대화 분석 결과가 추가됩니다:
+### Commit
+Commit as usual and LLM conversation analysis will be automatically added:
 
 ```bash
 git add .
 git commit -m "Fix authentication bug"
 ```
 
-결과:
+Result:
 ```
 Fix authentication bug
 
@@ -68,44 +68,44 @@ Context: Claude와의 대화에서 토큰 만료 시 에러 처리 방식에 대
 ---
 ```
 
-## 🛠 설정 (.sayu.yml)
+## Configuration (.sayu.yml)
 
 ```yaml
 connectors:
-  claude: true      # ✅ Claude 대화 로그 수집 (~/.claude/projects/)
-  cursor: true      # ✅ Cursor 대화 DB 수집 (~/Library/Application Support/Cursor/)
-  cli:              # ✅ CLI 명령어 추적
+  claude: true      # ✅ Collect Claude conversation logs (~/.claude/projects/)
+  cursor: true      # ✅ Collect Cursor conversation DB (~/Library/Application Support/Cursor/)
+  cli:              # ✅ Track CLI commands
     mode: "zsh-preexec"  # "zsh-preexec" | "atuin" | "off"
-  git: true         # ✅ Git 이벤트 수집
+  git: true         # ✅ Collect Git events
 
 window:
-  beforeCommitHours: 168  # 수집할 시간 범위 (일주일, 금요일→월요일 등 고려)
+  beforeCommitHours: 168  # Time range to collect (one week, considering Friday→Monday gaps)
 
 output:
-  commitTrailer: true    # 커밋 메시지에 트레일러 추가
-  gitNotes: false       # git notes 생성 (구현 예정)
+  commitTrailer: true    # Add trailer to commit messages
+  gitNotes: false       # Create git notes (planned)
 
 privacy:
-  maskSecrets: false     # 민감 정보 마스킹
-  masks: []             # 마스킹할 패턴들
+  maskSecrets: false     # Mask sensitive information
+  masks: []             # Patterns to mask
 ```
 
-## 🔐 API 키 설정 (.env)
+## API Key Setup (.env)
 
-LLM 요약 생성을 위해 API 키 중 하나를 설정하세요:
+Set one of these API keys for LLM summary generation:
 
 ```bash
-# Gemini (권장)
+# Gemini (recommended)
 GEMINI_API_KEY=your_api_key_here
 
-# 또는 OpenAI
+# Or OpenAI
 OPENAI_API_KEY=your_api_key_here
 
-# 또는 Anthropic
+# Or Anthropic
 ANTHROPIC_API_KEY=your_api_key_here
 ```
 
-## 🏗 아키텍처
+## Architecture
 
 ```
 [LLM Collectors] → [Smart Filter] → [LLM Analysis] → [Git Hooks]
@@ -116,109 +116,109 @@ Claude/Cursor → Utility-based → Gemini/GPT/Claude → Commit Trailer
                                  Analysis
 ```
 
-### 🔄 처리 과정
-1. **수집**: Claude JSONL, Cursor SQLite에서 대화 추출
-2. **필터링**: 도구 사용, 확인 메시지 등 저효용 이벤트 제거
-3. **분석**: LLM이 대화 패턴, 문제 해결 과정, 특이점 분석
-4. **요약**: 한글로 구조화된 Intent/Changes/Approach/Context 생성
+### Processing Flow
+1. **Collection**: Extract conversations from Claude JSONL, Cursor SQLite
+2. **Filtering**: Remove low-utility events (tool usage, confirmation messages)
+3. **Analysis**: LLM analyzes conversation patterns, problem-solving processes, anomalies
+4. **Summary**: Generate structured Korean Intent/Changes/Approach/Context
 
-## 📁 프로젝트 구조
+## Project Structure
 
 ```
 sayu/
 ├── src/
-│   ├── core/           # 핵심 모듈
-│   │   ├── types.ts              # 타입 정의
-│   │   ├── database.ts           # SQLite 이벤트 스토어
-│   │   ├── config.ts             # 설정 관리
-│   │   ├── git-hooks.ts          # Git 훅 관리
-│   │   ├── hook-handlers.ts      # 🔥 메인 로직 (LLM 요약, 필터링)
-│   │   ├── collector-manager.ts  # 수집기 통합 관리
-│   │   └── utils.ts              # 유틸리티
-│   ├── collectors/     # 이벤트 수집기
-│   │   ├── git.ts               # Git 이벤트
-│   │   ├── llm-claude.ts        # 🤖 Claude 대화 (JSONL)
-│   │   └── llm-cursor.ts        # 🤖 Cursor 대화 (SQLite)
-│   └── cli/           # CLI 명령어
-│       └── index.ts             # CLI 진입점
-├── dist/              # 빌드 출력
-├── .env               # API 키 설정
-└── .sayu.yml          # 프로젝트 설정
+│   ├── core/           # Core modules
+│   │   ├── types.ts              # Type definitions
+│   │   ├── database.ts           # SQLite event store
+│   │   ├── config.ts             # Configuration management
+│   │   ├── git-hooks.ts          # Git hook management
+│   │   ├── hook-handlers.ts      # 🔥 Main logic (LLM summary, filtering)
+│   │   ├── collector-manager.ts  # Collector integration
+│   │   └── utils.ts              # Utilities
+│   ├── collectors/     # Event collectors
+│   │   ├── git.ts               # Git events
+│   │   ├── llm-claude.ts        # 🤖 Claude conversations (JSONL)
+│   │   └── llm-cursor.ts        # 🤖 Cursor conversations (SQLite)
+│   └── cli/           # CLI commands
+│       └── index.ts             # CLI entry point
+├── dist/              # Build output
+├── .env               # API key configuration
+└── .sayu.yml          # Project configuration
 ```
 
-## 🔍 데이터 소스
+## Data Sources
 
-### LLM 대화 수집
-- **Claude**: `~/.claude/projects/{repo}/` JSONL 파일
+### LLM Conversation Collection
+- **Claude**: `~/.claude/projects/{repo}/` JSONL files
 - **Cursor**: `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`
 
-### 로컬 DB 저장
-이벤트는 `~/.sayu/events.db`에 저장됩니다:
+### Local Database Storage
+Events are stored in `~/.sayu/events.db`:
 
 ```sql
 CREATE TABLE events (
   id TEXT PRIMARY KEY,
-  ts INTEGER,           -- 타임스탬프
+  ts INTEGER,           -- Timestamp
   source TEXT,          -- 'git', 'llm'
   kind TEXT,            -- 'commit', 'chat'
-  repo TEXT,            -- 레포지토리 경로
-  cwd TEXT,             -- 작업 디렉토리
-  file TEXT,            -- 관련 파일
-  range TEXT,           -- 코드 범위
+  repo TEXT,            -- Repository path
+  cwd TEXT,             -- Working directory
+  file TEXT,            -- Related file
+  range TEXT,           -- Code range
   actor TEXT,           -- 'user', 'assistant'
-  text TEXT,            -- 이벤트 내용
-  url TEXT,             -- URL (있는 경우)
-  meta TEXT             -- JSON 메타데이터
+  text TEXT,            -- Event content
+  url TEXT,             -- URL (if available)
+  meta TEXT             -- JSON metadata
 );
 ```
 
-## 🧪 테스트
+## Testing
 
 ```bash
-# 빌드
+# Build
 npm run build
 
-# 현재 변경사항 미리보기
+# Preview current changes
 sayu preview
 
-# 시스템 상태 확인
+# Check system status
 sayu health
 
-# CLI 추적 관리
-sayu cli install    # zsh hook 설치
-sayu cli uninstall  # zsh hook 제거
+# CLI tracking management
+sayu cli install    # Install zsh hook
+sayu cli uninstall  # Remove zsh hook
 ```
 
-## 📝 로드맵
+## Roadmap
 
-- [x] **Phase 1**: 기초 인프라 (DB, Git 훅, 설정)
-- [x] **Phase 2**: Git 수집기 및 규칙 기반 요약  
-- [x] **Phase 3**: LLM 수집기 (Claude, Cursor) ✨
-- [x] **Phase 4**: 지능형 LLM 요약 (Gemini/GPT/Claude) ✨
-- [x] **Phase 5**: 스마트 필터링 & 한글 응답 ✨
-- [x] **Phase 6**: 대화 과정 분석 & 특이점 감지 ✨
-- [ ] **Phase 7**: CLI/Editor 수집기
-- [ ] **Phase 8**: 브라우저 활동 수집
-- [ ] **Phase 9**: Git notes 통합
+- [x] **Phase 1**: Core infrastructure (DB, Git hooks, config)
+- [x] **Phase 2**: Git collector and rule-based summaries  
+- [x] **Phase 3**: LLM collectors (Claude, Cursor) ✨
+- [x] **Phase 4**: Intelligent LLM summaries (Gemini/GPT/Claude) ✨
+- [x] **Phase 5**: Smart filtering & Korean responses ✨
+- [x] **Phase 6**: Conversation analysis & anomaly detection ✨
+- [ ] **Phase 7**: CLI/Editor collectors
+- [ ] **Phase 8**: Browser activity collection
+- [ ] **Phase 9**: Git notes integration
 
-## ⚡ 성능 특징
+## Performance Features
 
-- **93% 노이즈 제거**: 1200개 이벤트 → 80개 핵심 이벤트로 필터링
-- **실시간 처리**: 커밋당 2-3초 내 LLM 분석 완료
-- **메모리 효율**: 최대 2시간 범위로 제한, 과도한 데이터 수집 방지
-- **안전한 실패**: API 실패 시 간소화된 요약으로 대체
+- **93% noise reduction**: 1200 events → 80 core events filtering
+- **Real-time processing**: LLM analysis completed within 2-3 seconds per commit
+- **Memory efficient**: Limited to 2-hour range, prevents excessive data collection
+- **Safe failure**: Falls back to simplified summaries on API failures
 
-## 🎯 사용자 타겟
+## Target Users
 
-- **macOS + Cursor + Claude** 사용자에게 최적화
-- 한국어 개발팀/개발자
-- LLM 기반 개발 워크플로우 사용자
-- 커밋 히스토리 품질을 중시하는 팀
+- Optimized for **macOS + Cursor + Claude** users
+- Korean development teams/developers
+- LLM-based development workflow users
+- Teams that value commit history quality
 
-## 🤝 기여
+## Contributing
 
-PR과 이슈 환영합니다!
+PRs and issues are welcome!
 
-## 📄 라이선스
+## License
 
 MIT

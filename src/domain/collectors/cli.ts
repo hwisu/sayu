@@ -1,4 +1,4 @@
-import { Connector, Event, Config } from '../core/types';
+import { Connector, Event, Config } from '../events/types';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';

@@ -1,8 +1,8 @@
-import { Event, Config } from '../types';
-import { ClaudeCollector } from '../../collectors/llm-claude';
-import { CursorCollector } from '../../collectors/llm-cursor';
-import { CliCollector } from '../../collectors/cli';
-import { ErrorHandler } from '../error-handler';
+import { Event, Config } from '../events/types';
+import { ClaudeCollector } from './llm-claude';
+import { CursorCollector } from './llm-cursor';
+import { CliCollector } from './cli';
+import { ErrorHandler } from '../../shared/error-handler';
 
 /**
  * 이벤트 수집을 담당하는 클래스

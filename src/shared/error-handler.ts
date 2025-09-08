@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { i18n } from './i18n';
+import { i18n } from '../i18n';
 
 export interface ErrorContext {
   operation: string;
@@ -23,7 +23,7 @@ export class ErrorHandler {
       console.log(chalk.gray('💡 ' + context.suggestion));
     }
     
-    // Debug mode에서만 상세 에러 출력
+    // Only output detailed errors in debug mode
     if (process.env.SAYU_DEBUG === 'true') {
       console.error(chalk.gray('\n[Debug] Original error:'));
       console.error(error);
@@ -40,7 +40,7 @@ export class ErrorHandler {
   private static getUserFriendlyMessage(errorMessage: string, context: ErrorContext): string {
     const outputs = i18n().getOutputs();
     
-    // 일반적인 에러 패턴 매칭
+    // Match common error patterns
     if (errorMessage.includes('ENOENT')) {
       return `File not found during ${context.operation}`;
     }
@@ -57,7 +57,7 @@ export class ErrorHandler {
       return `API error during ${context.operation}`;
     }
     
-    // 특정 작업별 에러
+    // Operation-specific errors
     if (context.operation === 'git-hook-install') {
       return 'Failed to install git hooks';
     }
@@ -66,7 +66,7 @@ export class ErrorHandler {
       return 'Failed to collect LLM data';
     }
     
-    // 기본 에러 메시지
+    // Default error message
     return context.details || `Error during ${context.operation}: ${errorMessage}`;
   }
   

@@ -2,14 +2,14 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { GitHookManager } from '../core/git-hooks';
-import { ConfigManager } from '../core/config';
-import { HookHandlers } from '../core/hook-handlers';
-import { CliUtils } from '../core/utils';
-import { i18n } from '../core/i18n';
-import { StoreManager } from '../core/store-manager';
-import { LLMApiClient } from '../core/llm-api';
-import { CliCollector } from '../collectors/cli';
+import { GitHookManager } from '../domain/git/hooks';
+import { ConfigManager } from '../infra/config/manager';
+import { HookHandlers } from '../domain/git/handlers';
+import { CliUtils } from '../shared/utils';
+import { i18n } from '../i18n';
+import { StoreManager } from '../domain/events/store-manager';
+import { LLMApiClient } from '../infra/api/llm';
+import { CliCollector } from '../domain/collectors/cli';
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
@@ -86,10 +86,10 @@ program
       }
 
       if (type === 'commit-msg' && file) {
-        const { HookHandlers } = await import('../core/hook-handlers');
+        const { HookHandlers } = await import('../domain/git/handlers');
         await HookHandlers.handleCommitMsg(file);
       } else if (type === 'post-commit') {
-        const { HookHandlers } = await import('../core/hook-handlers');
+        const { HookHandlers } = await import('../domain/git/handlers');
         await HookHandlers.handlePostCommit();
       }
 

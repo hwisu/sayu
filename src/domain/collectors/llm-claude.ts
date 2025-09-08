@@ -1,4 +1,4 @@
-import { Connector, Event, Config } from '../core/types';
+import { Connector, Event, Config } from '../events/types';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';

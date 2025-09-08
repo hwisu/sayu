@@ -1,7 +1,7 @@
-import { koPrompts } from '../templates/prompts/ko';
-import { enPrompts } from '../templates/prompts/en';
-import { koOutputs } from '../templates/outputs/ko';
-import { enOutputs } from '../templates/outputs/en';
+import { koPrompts } from './prompts/ko';
+import { enPrompts } from './prompts/en';
+import { koOutputs } from './outputs/ko';
+import { enOutputs } from './outputs/en';
 
 export type SupportedLanguage = 'ko' | 'en';
 

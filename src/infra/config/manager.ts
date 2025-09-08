@@ -2,10 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
 import { z } from 'zod';
-import { Config } from './types';
-import { DEFAULT_SECURITY_MASKS } from './constants';
+import { Config } from '../../domain/events/types';
+import { DEFAULT_SECURITY_MASKS } from '../../shared/constants';
 
-// 간단한 설정 스키마 - 사용자가 변경할 수 있는 최소한의 옵션
+// Simple configuration schema - minimal options that users can modify
 export const UserConfigSchema = z.object({
   enabled: z.boolean().default(true),
   language: z.enum(['ko', 'en']).default('ko'), 
@@ -39,11 +39,11 @@ export class ConfigManager {
     return UserConfigSchema.parse(rawConfig);
   }
 
-  // 사용자 설정 + 환경변수 오버라이드 적용
+  // Apply user settings + environment variable overrides
   getUserConfig(): UserConfig {
     const config = { ...this.userConfig };
     
-    // 환경변수 오버라이드
+    // Environment variable overrides
     if (process.env.SAYU_ENABLED === 'false') config.enabled = false;
     if (process.env.SAYU_LANG === 'en' || process.env.SAYU_LANG === 'ko') {
       config.language = process.env.SAYU_LANG;
@@ -53,7 +53,7 @@ export class ConfigManager {
     return config;
   }
 
-  // 기존 코드 호환성을 위한 전체 Config 반환 (대부분 고정된 기본값)
+  // Return full Config for backward compatibility (mostly fixed default values)
   get(): Config {
     const userConfig = this.getUserConfig();
     
@@ -86,7 +86,7 @@ export class ConfigManager {
     };
   }
 
-  // SimpleConfig 호환 메소드
+  // SimpleConfig compatibility method
   getEffectiveConfig(): UserConfig {
     return this.getUserConfig();
   }
@@ -111,23 +111,23 @@ export class ConfigManager {
     }
 
     const defaultConfig = `# Sayu Configuration
-# AI가 당신의 개발 컨텍스트를 자동으로 수집합니다
+# AI automatically collects your development context
 
-# Sayu 활성화 (false로 설정하면 비활성화)
+# Enable Sayu (set to false to disable)
 enabled: true
 
-# 언어 설정 (ko: 한국어, en: English)  
+# Language setting (ko: Korean, en: English)  
 language: ko
 
-# 커밋 메시지에 AI 컨텍스트 추가
+# Add AI context to commit messages
 commitTrailer: true
 
-# 환경변수로도 설정 가능:
+# Can also be configured via environment variables:
 # SAYU_ENABLED=false
 # SAYU_LANG=en  
 # SAYU_TRAILER=false
 #
-# LLM API 키는 .env 파일에:
+# LLM API keys in .env file:
 # GEMINI_API_KEY=your-key
 # OPENAI_API_KEY=your-key
 # ANTHROPIC_API_KEY=your-key
@@ -138,6 +138,6 @@ commitTrailer: true
   }
 }
 
-// SimpleConfigManager 대체를 위한 별칭
+// Alias for SimpleConfigManager replacement
 export { ConfigManager as SimpleConfigManager };
 export type { UserConfig as SimpleConfigType };

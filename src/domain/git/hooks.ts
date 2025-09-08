@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { ShellExecutor } from './shell';
+import { ShellExecutor } from '../../infra/shell/executor';
 
 export class GitHookManager {
   private repoRoot: string;

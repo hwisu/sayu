@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { GitHookManager } from './git-hooks';
+import { GitHookManager } from '../domain/git/hooks';
 
 export class CliUtils {
   /**

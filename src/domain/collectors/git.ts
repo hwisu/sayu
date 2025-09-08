@@ -1,4 +1,4 @@
-import { Connector, Event, Config } from '../core/types';
+import { Connector, Event, Config } from '../events/types';
 import simpleGit, { SimpleGit } from 'simple-git';
 import { randomUUID } from 'crypto';
 import { execSync } from 'child_process';

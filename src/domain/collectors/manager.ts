@@ -1,12 +1,12 @@
-import { EventStore } from './database';
-import { IdGenerator } from './utils';
-import { ConfigManager } from './config';
-import { GitCollector } from '../collectors/git';
-import { ClaudeCollector } from '../collectors/llm-claude';
-import { CursorCollector } from '../collectors/llm-cursor';
-import { CliCollector } from '../collectors/cli';
-import { Event, Config } from './types';
-import { GitHookManager } from './git-hooks';
+import { EventStore } from '../events/store';
+import { IdGenerator } from '../../shared/utils';
+import { ConfigManager } from '../../infra/config/manager';
+import { GitCollector } from './git';
+import { ClaudeCollector } from './llm-claude';
+import { CursorCollector } from './llm-cursor';
+import { CliCollector } from './cli';
+import { Event, Config } from '../events/types';
+import { GitHookManager } from '../git/hooks';
 
 export class CollectorManager {
   private store: EventStore;
@@ -27,18 +27,18 @@ export class CollectorManager {
     this.cliCollector = new CliCollector(this.repoRoot);
   }
 
-  // 현재 스테이징된 변경사항에 대한 이벤트 수집
+  // Collect events for currently staged changes
   async collectCurrentCommit(): Promise<Event[]> {
     const events: Event[] = [];
     const now = Date.now();
     
-    // Git 컬렉터로 현재 상태 수집
+    // Collect current state with Git collector
     const gitContext = await this.gitCollector.getCurrentCommitContext();
     
-    // 스테이징된 파일들은 이벤트로 저장하지 않음 (중요하지 않음)
-    // 대신 hook-handlers에서 파일 목록만 사용
+    // Don't store staged files as events (not important)
+    // Instead, only use file list in hook-handlers
     
-    // diff 정보는 저장 (나중에 상세 분석용)
+    // Store diff information (for detailed analysis later)
     if (gitContext.diff) {
       const diffEvent: Event = {
         id: this.generateId(),
@@ -50,12 +50,12 @@ export class CollectorManager {
         file: null,
         range: null,
         actor: 'user',
-        text: gitContext.diff.substring(0, 1000), // 처음 1000자만
+        text: gitContext.diff.substring(0, 1000), // Only first 1000 characters
         url: null,
         meta: {
           type: 'diff',
           fullLength: gitContext.diff.length,
-          files: gitContext.files.join(',')  // 파일 목록은 메타에 저장
+          files: gitContext.files.join(',')  // Store file list in meta
         }
       };
       
@@ -66,22 +66,22 @@ export class CollectorManager {
     return events;
   }
 
-  // 시간 범위로 이벤트 수집
+  // Collect events within time range
   async collectInTimeWindow(hours: number = 168): Promise<Event[]> {
     const now = Date.now();
     const sinceMs = now - (hours * 60 * 60 * 1000);
     
-    // 마지막 커밋 시간 확인
+    // Check last commit time
     const lastCommitTime = this.store.getLastCommitTime(this.repoRoot);
     const startTime = lastCommitTime || sinceMs;
     
     const allEvents: Event[] = [];
     
-    // Git 이벤트 수집
+    // Collect Git events
     const gitEvents = await this.gitCollector.pullSince(startTime, now, this.config);
     allEvents.push(...gitEvents);
     
-    // Claude 이벤트 수집 (설정에서 활성화된 경우)
+    // Collect Claude events (if enabled in config)
     if (this.config.connectors.claude) {
       try {
         const claudeEvents = await this.claudeCollector.pullSince(startTime, now, this.config);
@@ -91,7 +91,7 @@ export class CollectorManager {
       }
     }
     
-    // Cursor 이벤트 수집 (설정에서 활성화된 경우)
+    // Collect Cursor events (if enabled in config)
     if (this.config.connectors.cursor) {
       try {
         const cursorEvents = await this.cursorCollector.pullSince(startTime, now, this.config);
@@ -101,7 +101,7 @@ export class CollectorManager {
       }
     }
     
-    // CLI 이벤트 수집 (설정에서 활성화된 경우)
+    // Collect CLI events (if enabled in config)
     if (this.config.connectors.cli.mode !== 'off') {
       try {
         const cliEvents = await this.cliCollector.pullSince(startTime, now, this.config);
@@ -111,12 +111,12 @@ export class CollectorManager {
       }
     }
     
-    // DB에 저장
+    // Store in database
     if (allEvents.length > 0) {
       this.store.insertBatch(allEvents);
     }
     
-    // DB에서 시간 창 내 모든 이벤트 조회 (시간순 정렬)
+    // Query all events within time window from DB (sorted by time)
     return this.store.findByRepo(this.repoRoot, startTime, now);
   }
 

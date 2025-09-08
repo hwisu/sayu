@@ -1,4 +1,4 @@
-import { ShellExecutor } from '../shell';
+import { ShellExecutor } from '../../infra/shell/executor';
 
 /**
  * Git 관련 정보 수집을 담당하는 클래스
