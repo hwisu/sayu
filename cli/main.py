@@ -120,6 +120,21 @@ def health():
         except:
             print("❌ Database connection failed")
         
+        # Check collectors
+        try:
+            from domain.collectors.manager import CollectorManager
+            collector_manager = CollectorManager(repo_root)
+            collector_health = collector_manager.health_check()
+            
+            if collector_health['cursor']['ok']:
+                cursor_info = collector_health['cursor']
+                print(f"✅ Cursor connected ({cursor_info.get('conversations', 0)} conversations)")
+            else:
+                print(f"⚠️  Cursor: {collector_health['cursor']['reason']}")
+                
+        except Exception as e:
+            print(f"⚠️  Cursor collector error: {e}")
+        
         # Check API keys
         available_apis = LLMApiClient.get_available_apis()
         if available_apis['gemini']:
