@@ -58,12 +58,10 @@ def init(no_interactive):
         
         # Check API keys
         available_apis = LLMApiClient.get_available_apis()
-        if not any([available_apis['gemini'], available_apis['openai'], available_apis['anthropic']]):
+        if not available_apis['gemini']:
             print("\n⚠️  No LLM API keys configured")
-            print("\nAdd one of these to your .env file:")
+            print("\nAdd this to your .env file:")
             print("  GEMINI_API_KEY=your-key")
-            print("  OPENAI_API_KEY=your-key")
-            print("  ANTHROPIC_API_KEY=your-key")
         else:
             print("\n🎉 All set! AI context will be automatically added to your commits.")
             
@@ -145,10 +143,6 @@ def health():
         available_apis = LLMApiClient.get_available_apis()
         if available_apis['gemini']:
             print("✅ Gemini API configured")
-        elif available_apis['openai']:
-            print("✅ OpenAI API configured")
-        elif available_apis['anthropic']:
-            print("✅ Anthropic API configured")
         else:
             print("⚠️  No LLM API keys configured")
         

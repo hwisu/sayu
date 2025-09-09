@@ -26,10 +26,6 @@ MAX_FILE_DISPLAY: Final[int] = 3
 # LLM API constants
 LLM_TEMPERATURE: Final[float] = 0.1
 LLM_MAX_OUTPUT_TOKENS: Final[int] = 8192
-OPENAI_TEMPERATURE: Final[float] = 0.3
-OPENAI_MAX_TOKENS: Final[int] = 1000
-ANTHROPIC_TEMPERATURE: Final[float] = 0.3
-ANTHROPIC_MAX_TOKENS: Final[int] = 1000
 
 # Filtering constants
 MIN_RELEVANCE_SCORE: Final[float] = 0.6

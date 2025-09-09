@@ -139,8 +139,6 @@ commitTrailer: true
 #
 # LLM API keys in .env file:
 # GEMINI_API_KEY=your-key
-# OPENAI_API_KEY=your-key
-# ANTHROPIC_API_KEY=your-key
 """
         
         with open(config_path, 'w', encoding='utf-8') as f:

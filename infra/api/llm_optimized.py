@@ -9,9 +9,7 @@ from typing import Dict, Any, Optional, Tuple
 import httpx
 
 from shared.constants import (
-    LLM_TEMPERATURE, LLM_MAX_OUTPUT_TOKENS,
-    OPENAI_TEMPERATURE, OPENAI_MAX_TOKENS,
-    ANTHROPIC_TEMPERATURE, ANTHROPIC_MAX_TOKENS
+    LLM_TEMPERATURE, LLM_MAX_OUTPUT_TOKENS
 )
 
 
@@ -24,7 +22,7 @@ class OptimizedLLMApiClient:
     
     @classmethod
     def call_llm(cls, prompt: str, use_cache: bool = True) -> str:
-        """Call LLM API with priority order: Gemini -> OpenAI -> Anthropic"""
+        """Call LLM API (Gemini only)"""
         # Check cache first
         if use_cache:
             cached_response = cls._get_cached(prompt)
@@ -32,15 +30,10 @@ class OptimizedLLMApiClient:
                 return cached_response
         
         # Make API call
-        response = None
-        if os.getenv('GEMINI_API_KEY'):
-            response = cls._call_gemini(prompt)
-        elif os.getenv('OPENAI_API_KEY'):
-            response = cls._call_openai(prompt)
-        elif os.getenv('ANTHROPIC_API_KEY'):
-            response = cls._call_anthropic(prompt)
-        else:
-            raise ValueError('No LLM API key found')
+        if not os.getenv('GEMINI_API_KEY'):
+            raise ValueError('GEMINI_API_KEY not found')
+        
+        response = cls._call_gemini(prompt)
         
         # Cache the response
         if use_cache and response:
@@ -106,74 +99,11 @@ class OptimizedLLMApiClient:
             
             raise ValueError('Invalid Gemini response structure')
     
-    @classmethod
-    def _call_openai(cls, prompt: str) -> str:
-        """Call OpenAI API using httpx"""
-        api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key:
-            raise ValueError('OPENAI_API_KEY not found in environment')
-        
-        url = 'https://api.openai.com/v1/chat/completions'
-        
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
-        }
-        
-        payload = {
-            "model": "gpt-3.5-turbo",
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": OPENAI_MAX_TOKENS,
-            "temperature": OPENAI_TEMPERATURE
-        }
-        
-        with httpx.Client(timeout=30.0) as client:
-            response = client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            
-            data = response.json()
-            if data.get('choices') and data['choices'][0]:
-                return data['choices'][0]['message']['content'].strip()
-            
-            raise ValueError('Invalid OpenAI response structure')
     
-    @classmethod
-    def _call_anthropic(cls, prompt: str) -> str:
-        """Call Anthropic API using httpx"""
-        api_key = os.getenv('ANTHROPIC_API_KEY')
-        if not api_key:
-            raise ValueError('ANTHROPIC_API_KEY not found in environment')
-        
-        url = 'https://api.anthropic.com/v1/messages'
-        
-        headers = {
-            'x-api-key': api_key,
-            'anthropic-version': '2023-06-01',
-            'Content-Type': 'application/json'
-        }
-        
-        payload = {
-            "model": "claude-3-haiku-20240307",
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": ANTHROPIC_MAX_TOKENS,
-            "temperature": ANTHROPIC_TEMPERATURE
-        }
-        
-        with httpx.Client(timeout=30.0) as client:
-            response = client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            
-            data = response.json()
-            if data.get('content') and data['content'][0]:
-                return data['content'][0]['text'].strip()
-            
-            raise ValueError('Invalid Anthropic response structure')
     
     @classmethod
     def get_available_apis(cls) -> Dict[str, bool]:
         """Get available API keys"""
         return {
-            'gemini': bool(os.getenv('GEMINI_API_KEY')),
-            'openai': bool(os.getenv('OPENAI_API_KEY')),
-            'anthropic': bool(os.getenv('ANTHROPIC_API_KEY'))
+            'gemini': bool(os.getenv('GEMINI_API_KEY'))
         }

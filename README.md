@@ -44,17 +44,11 @@ This will:
 
 ### 2. Set API Key (.env)
 
-Add one of these API keys:
+Add your API key:
 
 ```bash
-# Gemini (recommended - fast and affordable)
+# Gemini API key (required)
 GEMINI_API_KEY=your_api_key_here
-
-# Or OpenAI
-OPENAI_API_KEY=your_api_key_here
-
-# Or Anthropic
-ANTHROPIC_API_KEY=your_api_key_here
 ```
 
 ### 3. Commit as usual

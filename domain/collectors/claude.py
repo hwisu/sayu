@@ -189,7 +189,7 @@ class ClaudeCollector:
                 # Skip conversations not in a git repository
                 if os.getenv('SAYU_DEBUG'):
                     print(f"Skipping conversation - no valid git repo found for cwd: {cwd}")
-                continue
+                return None
             
             # Create event
             event = Event(

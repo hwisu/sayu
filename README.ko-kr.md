@@ -43,17 +43,11 @@ sayu init
 
 ### 2. API 키 설정 (.env)
 
-다음 중 하나의 API 키를 설정하세요:
+API 키를 설정하세요:
 
 ```bash
-# Gemini (추천 - 빠르고 저렴)
+# Gemini API 키 (필수)
 GEMINI_API_KEY=your_api_key_here
-
-# 또는 OpenAI
-OPENAI_API_KEY=your_api_key_here
-
-# 또는 Anthropic
-ANTHROPIC_API_KEY=your_api_key_here
 ```
 
 ### 3. 평소처럼 커밋하기
