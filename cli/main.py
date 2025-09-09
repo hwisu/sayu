@@ -18,7 +18,7 @@ from i18n import i18n
 
 
 @click.group()
-@click.version_option(version='0.1.0', prog_name='sayu')
+@click.version_option(version='0.2.0', prog_name='sayu')
 def cli():
     """Sayu - Automatically capture the 'why' behind your code changes"""
     pass
