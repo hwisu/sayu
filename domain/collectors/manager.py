@@ -42,7 +42,7 @@ class CollectorManager:
         """Collect events for currently staged changes"""
         events = []
         
-        # Get current commit context
+        # Get current commit context with file diffs
         git_context = self.git_collector.get_current_commit_context()
         
         # Store diff information if available
@@ -51,6 +51,7 @@ class CollectorManager:
             import uuid
             import time
             
+            # Create event for overall diff stats
             diff_event = Event(
                 id=str(uuid.uuid4()),
                 ts=int(time.time() * 1000),
@@ -64,14 +65,37 @@ class CollectorManager:
                 text=git_context['diff'][:1000],  # Only first 1000 characters
                 url=None,
                 meta={
-                    'type': 'diff',
+                    'type': 'diff_summary',
                     'full_length': len(git_context['diff']),
-                    'files': ','.join(git_context['files'])
+                    'files': git_context['files']
                 }
             )
             
             events.append(diff_event)
             self.store.insert(diff_event)
+            
+            # Store individual file diffs
+            for file_path, file_diff in git_context.get('file_diffs', {}).items():
+                file_event = Event(
+                    id=str(uuid.uuid4()),
+                    ts=int(time.time() * 1000),
+                    source=EventSource.GIT,
+                    kind=EventKind.COMMIT,
+                    repo=self.repo_root,
+                    cwd=self.repo_root,
+                    file=file_path,
+                    range=None,
+                    actor=Actor.USER,
+                    text=file_diff,
+                    url=None,
+                    meta={
+                        'type': 'file_diff',
+                        'file': file_path
+                    }
+                )
+                
+                events.append(file_event)
+                self.store.insert(file_event)
         
         return events
     

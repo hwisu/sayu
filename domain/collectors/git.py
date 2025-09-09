@@ -51,6 +51,7 @@ class GitCollector:
             ], cwd=self.repo_root, check=False)
             
             if result.returncode == 0 and result.stdout.strip():
+                commits = []
                 for line in result.stdout.strip().split('\n'):
                     if line:
                         parts = line.split('|')
@@ -61,6 +62,16 @@ class GitCollector:
                             email = parts[3]
                             timestamp = int(parts[4]) * 1000  # Convert to milliseconds
                             parents = parts[5] if len(parts) > 5 else ''
+                            
+                            commit_info = {
+                                'hash': commit_hash,
+                                'message': message,
+                                'author': author,
+                                'email': email,
+                                'timestamp': timestamp,
+                                'parents': parents.split() if parents else []
+                            }
+                            commits.append(commit_info)
                             
                             event = Event(
                                 id=str(uuid.uuid4()),
@@ -83,6 +94,38 @@ class GitCollector:
                             )
                             
                             events.append(event)
+                
+                # For each commit, get the file changes
+                for i, commit in enumerate(commits):
+                    commit_hash = commit['hash']
+                    parent_hash = commit['parents'][0] if commit['parents'] else None
+                    
+                    if parent_hash:
+                        # Get changes between this commit and its parent
+                        changes = self.get_changes_between_commits(parent_hash, commit_hash)
+                        
+                        # Create events for file changes
+                        for file_path, file_diff in changes['file_diffs'].items():
+                            file_event = Event(
+                                id=str(uuid.uuid4()),
+                                ts=commit['timestamp'],
+                                source=EventSource.GIT,
+                                kind=EventKind.COMMIT,
+                                repo=self.repo_root,
+                                cwd=self.repo_root,
+                                file=file_path,
+                                range=None,
+                                actor=Actor.USER,
+                                text=file_diff[:5000],  # Limit to 5000 chars
+                                url=None,
+                                meta={
+                                    'type': 'file_change',
+                                    'commit': commit_hash,
+                                    'parent': parent_hash,
+                                    'file': file_path
+                                }
+                            )
+                            events.append(file_event)
         
         except Exception as e:
             if os.getenv('SAYU_DEBUG'):
@@ -142,7 +185,9 @@ class GitCollector:
             
             # Get diff
             diff = ''
+            file_diffs = {}
             if staged_files:
+                # Get full diff
                 diff_result = ShellExecutor.git_exec(
                     ['diff', '--cached'], 
                     cwd=self.repo_root,
@@ -150,10 +195,37 @@ class GitCollector:
                 )
                 if diff_result.returncode == 0:
                     diff = diff_result.stdout
+                
+                # Get individual file diffs (excluding installation files)
+                excluded_patterns = [
+                    'package.json', 'package-lock.json', 'yarn.lock', 
+                    'pnpm-lock.yaml', 'Gemfile.lock', 'Pipfile.lock',
+                    'poetry.lock', 'composer.lock', 'go.sum',
+                    'Cargo.lock', 'requirements.txt', 'requirements-*.txt'
+                ]
+                
+                for file in staged_files:
+                    # Check if file should be excluded
+                    should_exclude = False
+                    for pattern in excluded_patterns:
+                        if file.endswith(pattern) or pattern in file:
+                            should_exclude = True
+                            break
+                    
+                    if not should_exclude:
+                        # Get diff for individual file
+                        file_diff_result = ShellExecutor.git_exec(
+                            ['diff', '--cached', '--', file], 
+                            cwd=self.repo_root,
+                            check=False
+                        )
+                        if file_diff_result.returncode == 0:
+                            file_diffs[file] = file_diff_result.stdout
             
             return {
                 'files': staged_files,
-                'diff': diff
+                'diff': diff,
+                'file_diffs': file_diffs
             }
         
         except Exception as e:
@@ -161,7 +233,8 @@ class GitCollector:
                 print(f"Error getting commit context: {e}")
             return {
                 'files': [],
-                'diff': ''
+                'diff': '',
+                'file_diffs': {}
             }
     
     def get_last_commit(self) -> Optional[Dict[str, Any]]:
@@ -217,3 +290,85 @@ class GitCollector:
             'C': 'copied'
         }
         return status_map.get(git_status, git_status.lower())
+    
+    def get_changes_between_commits(self, from_commit: Optional[str] = None, to_commit: str = 'HEAD') -> Dict[str, Any]:
+        """Get file changes between commits (or from last commit to working directory)"""
+        try:
+            changes = []
+            file_diffs = {}
+            
+            # If no from_commit specified, get last commit
+            if not from_commit:
+                last_commit_info = self.get_last_commit()
+                if last_commit_info:
+                    from_commit = last_commit_info['hash']
+                else:
+                    # No previous commits, compare against empty tree
+                    from_commit = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'  # Empty tree SHA
+            
+            # Get list of changed files
+            result = ShellExecutor.git_exec(
+                ['diff', '--name-status', from_commit, to_commit],
+                cwd=self.repo_root,
+                check=False
+            )
+            
+            if result.returncode == 0 and result.stdout.strip():
+                # Parse changed files
+                for line in result.stdout.strip().split('\n'):
+                    if '\t' in line:
+                        parts = line.split('\t', 1)
+                        status = parts[0]
+                        filename = parts[1]
+                        
+                        changes.append({
+                            'file': filename,
+                            'status': self._map_status(status[0])  # Take first char for complex statuses
+                        })
+                
+                # Get file diffs (excluding installation files)
+                excluded_patterns = [
+                    'package.json', 'package-lock.json', 'yarn.lock', 
+                    'pnpm-lock.yaml', 'Gemfile.lock', 'Pipfile.lock',
+                    'poetry.lock', 'composer.lock', 'go.sum',
+                    'Cargo.lock', 'requirements.txt', 'requirements-*.txt',
+                    '.min.js', '.min.css', 'vendor/', 'node_modules/',
+                    'dist/', 'build/', '.map'
+                ]
+                
+                for change in changes:
+                    filename = change['file']
+                    
+                    # Check if file should be excluded
+                    should_exclude = False
+                    for pattern in excluded_patterns:
+                        if pattern in filename or filename.endswith(pattern):
+                            should_exclude = True
+                            break
+                    
+                    if not should_exclude and change['status'] != 'deleted':
+                        # Get file diff
+                        diff_result = ShellExecutor.git_exec(
+                            ['diff', from_commit, to_commit, '--', filename],
+                            cwd=self.repo_root,
+                            check=False
+                        )
+                        if diff_result.returncode == 0:
+                            file_diffs[filename] = diff_result.stdout
+            
+            return {
+                'changes': changes,
+                'file_diffs': file_diffs,
+                'from_commit': from_commit,
+                'to_commit': to_commit
+            }
+            
+        except Exception as e:
+            if os.getenv('SAYU_DEBUG'):
+                print(f"Error getting changes between commits: {e}")
+            return {
+                'changes': [],
+                'file_diffs': {},
+                'from_commit': from_commit,
+                'to_commit': to_commit
+            }

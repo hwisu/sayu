@@ -63,6 +63,9 @@ class HookHandlers:
                 # Filter for LLM events (conversations)
                 llm_events = [e for e in recent_events if e.source in [EventSource.LLM]]
                 
+                # Get current commit context with file diffs
+                git_context = collector_manager.git_collector.get_current_commit_context()
+                
                 # Add current diff as context event
                 if diff_stats['stat_output']:
                     diff_event = Event(
@@ -74,7 +77,11 @@ class HookHandlers:
                         cwd=repo_root,
                         actor=Actor.USER,
                         text=diff_stats['stat_output'],
-                        meta={'type': 'diff_stats', 'files': staged_files}
+                        meta={
+                            'type': 'diff_stats', 
+                            'files': staged_files,
+                            'file_diffs': git_context.get('file_diffs', {})
+                        }
                     )
                     llm_events.append(diff_event)
                 
@@ -202,6 +209,9 @@ class HookHandlers:
                 print(f"  - CLI events: {len(cli_events)}")
                 print(f"  - Git events: {len(git_events)}")
                 
+                # Get current commit context with file diffs
+                git_context = collector_manager.git_collector.get_current_commit_context()
+                
                 # Add current diff as context
                 if diff_stats['stat_output']:
                     diff_event = Event(
@@ -213,7 +223,11 @@ class HookHandlers:
                         cwd=repo_root,
                         actor=Actor.USER,
                         text=diff_stats['stat_output'],
-                        meta={'type': 'diff_stats', 'files': staged_files}
+                        meta={
+                            'type': 'diff_stats', 
+                            'files': staged_files,
+                            'file_diffs': git_context.get('file_diffs', {})
+                        }
                     )
                     llm_events.append(diff_event)
                 
