@@ -4,16 +4,13 @@ import json
 import re
 from typing import List, Dict, Any
 
-from domain.events.types import Event, LLMSummaryResponse
-from infra.api.llm_optimized import OptimizedLLMApiClient as LLMApiClient
+from domain.events.types import Event
+from infra.api.llm import LLMApiClient
 from i18n import i18n
 from shared.constants import (
     MAX_CONVERSATION_COUNT, MAX_CONVERSATION_LENGTH,
     MAX_SIMPLIFIED_CONVERSATIONS, MAX_SIMPLIFIED_LENGTH,
-    MAX_HIGH_VALUE_EVENTS, MAX_DIFF_LENGTH,
-    MIN_RESPONSE_LENGTH, MAX_RAW_RESPONSE_LENGTH,
-    MAX_COMMIT_TRAILER_LINES, MAX_LINE_LENGTH,
-    MAX_FILE_DISPLAY, SUMMARY_SEPARATOR, SUMMARY_FOOTER
+    MAX_RAW_RESPONSE_LENGTH, MAX_LINE_LENGTH,
 )
 
 
@@ -94,13 +91,13 @@ class LLMSummaryGenerator:
         
         # Handle what_changed
         if parsed.get('what_changed'):
-            lines.append(outputs['trailer_labels']['changes'])
+            lines.append(outputs['trailer_labels']['what_changed'])
             lines.append(LLMSummaryGenerator._wrap_text(parsed['what_changed'], 2))
             lines.append('')
         
         # Handle conversation_flow
         if parsed.get('conversation_flow'):
-            lines.append(outputs['trailer_labels']['context'])
+            lines.append(outputs['trailer_labels']['conversation_flow'])
             lines.append(LLMSummaryGenerator._wrap_text(parsed['conversation_flow'], 2))
             lines.append('')
         

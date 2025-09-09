@@ -5,8 +5,8 @@ en_outputs = {
     'trailer_header': 'AI-Context (sayu)',
     'trailer_labels': {
         'intent': 'Intent:',
-        'changes': 'Changes:',
-        'context': 'Context:'
+        'what_changed': 'Changes:',
+        'conversation_flow': 'Context:'
     },
 
     # CLI messages
