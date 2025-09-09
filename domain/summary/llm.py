@@ -146,7 +146,7 @@ class LLMSummaryGenerator:
         """Format raw response as fallback"""
         lines = []
         lines.append('---')
-        lines.append('AI-Context (sayu)')
+        lines.append('思惟---')
         
         clean_text = re.sub(r'[\n\r]+', ' ', text).strip()
         if len(clean_text) > MAX_RAW_RESPONSE_LENGTH:
@@ -154,7 +154,7 @@ class LLMSummaryGenerator:
         else:
             lines.append(f"Summary: {clean_text}")
         
-        lines.append('---')
+        lines.append('---FIN---')
         
         return '\n'.join(lines)
     

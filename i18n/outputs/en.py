@@ -2,11 +2,11 @@
 
 en_outputs = {
     # Git trailer related
-    'trailer_header': 'AI-Context (sayu)',
+    'trailer_header': 'Thought---',
     'trailer_labels': {
         'intent': 'Intent:',
-        'what_changed': 'Changes:',
-        'conversation_flow': 'Context:'
+        'what_changed': 'What changed:',
+        'conversation_flow': 'Conversation flow:'
     },
 
     # CLI messages

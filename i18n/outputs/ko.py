@@ -5,8 +5,8 @@ ko_outputs = {
     'trailer_header': 'AI-Context (sayu)',
     'trailer_labels': {
         'intent': 'Intent:',
-        'what_changed': 'Changes:',
-        'conversation_flow': 'Context:'
+        'what_changed': '변경된 내용:',
+        'conversation_flow': '대화 흐름:'
     },
 
     # CLI messages
