@@ -5,7 +5,7 @@ import re
 from typing import List, Dict, Any
 
 from domain.events.types import Event, LLMSummaryResponse
-from infra.api.llm import LLMApiClient
+from infra.api.llm_optimized import OptimizedLLMApiClient as LLMApiClient
 from i18n import i18n
 from shared.constants import TextConstants
 
