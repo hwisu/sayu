@@ -95,47 +95,37 @@ sayu collector cli-uninstall
 ## 설정 (.sayu.yml)
 
 ```yaml
-# 어떤 도구에서 대화를 수집할지
+# Sayu Configuration
+# 커밋에 '왜'를 남기는 개인 로컬 블랙박스
+
 connectors:
-  claude: true      # Claude Desktop 대화 수집
-  cursor: true      # Cursor 대화 수집
-  cli:              # 터미널 명령어 수집
-    mode: "off"     # "zsh-preexec" | "off"
+  claude: true
+  cursor: true
+  editor: true
+  cli:
+    mode: "zsh-preexec"   # or "atuin" | "off"
 
-# 얼마나 과거의 대화를 볼지 (시간 단위)
-window:
-  beforeCommitHours: 168  # 일주일 (금요일→월요일 고려)
-
-# 커밋 메시지에 추가할지
-commitTrailer: true
-
-# 언어 설정
-language: "ko"  # "ko" | "en"
-
-# 개인정보 보호
 privacy:
-  maskSecrets: true
-  masks: []  # 숨길 패턴들
+  maskSecrets: true       # 민감정보 마스킹 여부
+  masks:                  # 추가 마스킹 패턴 (정규식)
+    - "AKIA[0-9A-Z]{16}"  # AWS Access Key
+    - "(?i)authorization:\\s*Bearer\\s+[A-Za-z0-9._-]+"
+
+output:
+  commitTrailer: true     # 커밋 메시지에 트레일러 추가
 ```
 
-## 설정 가능한 상수들
+## 환경 변수
 
-`shared/constants.py`에서 다음 값들을 조정할 수 있습니다:
+```bash
+# 언어 및 기능 설정
+SAYU_ENABLED=false      # Sayu 비활성화
+SAYU_LANG=ko           # 언어 설정 (ko | en)
+SAYU_TRAILER=false     # 커밋 트레일러 비활성화
 
-### 시간 관련
-- `COMMIT_WINDOW_HOURS`: 24 (커밋 시점 기준 몇 시간 전까지 볼지)
-- `DEFAULT_LOOKBACK_HOURS`: 168 (기본 수집 기간, 1주일)
-- `CACHE_TTL_SECONDS`: 300 (캐시 유효 시간)
-
-### 텍스트 처리
-- `MAX_CONVERSATION_COUNT`: 20 (최대 대화 수)
-- `MAX_CONVERSATION_LENGTH`: 800 (대화당 최대 길이)
-- `MAX_DIFF_LENGTH`: 2000 (diff 최대 길이)
-- `MIN_RESPONSE_LENGTH`: 50 (최소 응답 길이)
-
-### LLM API
-- `LLM_TEMPERATURE`: 0.1 (창의성 수준, 낮을수록 일관성 높음)
-- `LLM_MAX_OUTPUT_TOKENS`: 8192 (최대 출력 토큰)
+# API 키 (.env 파일)
+GEMINI_API_KEY=your-key-here
+```
 
 ## FAQ
 

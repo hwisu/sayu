@@ -96,47 +96,37 @@ sayu collector cli-uninstall
 ## Configuration (.sayu.yml)
 
 ```yaml
-# Data sources
+# Sayu Configuration
+# AI automatically collects your development context
+
 connectors:
-  claude: true      # Claude Desktop conversations
-  cursor: true      # Cursor conversations
-  cli:              # Terminal commands
-    mode: "off"     # "zsh-preexec" | "off"
+  claude: true
+  cursor: true
+  editor: true
+  cli:
+    mode: "zsh-preexec"   # or "atuin" | "off"
 
-# Time window for data collection (hours)
-window:
-  beforeCommitHours: 168  # One week
-
-# Add context to commit messages
-commitTrailer: true
-
-# Language
-language: "en"  # "ko" | "en"
-
-# Privacy
 privacy:
-  maskSecrets: true
-  masks: []  # Regex patterns to redact
+  maskSecrets: true       # Mask sensitive information
+  masks:                  # Additional masking patterns (regex)
+    - "AKIA[0-9A-Z]{16}"  # AWS Access Key
+    - "(?i)authorization:\\s*Bearer\\s+[A-Za-z0-9._-]+"
+
+output:
+  commitTrailer: true     # Add trailer to commit messages
 ```
 
-## Configurable Constants
+## Environment Variables
 
-Edit values in `shared/constants.py`:
+```bash
+# Language and feature toggles
+SAYU_ENABLED=false      # Disable Sayu
+SAYU_LANG=en           # Language (ko | en)
+SAYU_TRAILER=false     # Disable commit trailer
 
-### Time Settings
-- `COMMIT_WINDOW_HOURS`: 24 (hours to look back from commit)
-- `DEFAULT_LOOKBACK_HOURS`: 168 (default collection period)
-- `CACHE_TTL_SECONDS`: 300 (cache validity)
-
-### Text Processing
-- `MAX_CONVERSATION_COUNT`: 20 (max conversations)
-- `MAX_CONVERSATION_LENGTH`: 800 (max length per conversation)
-- `MAX_DIFF_LENGTH`: 2000 (max diff length)
-- `MIN_RESPONSE_LENGTH`: 50 (min response length)
-
-### LLM Settings
-- `LLM_TEMPERATURE`: 0.1 (lower = more consistent)
-- `LLM_MAX_OUTPUT_TOKENS`: 8192 (max output tokens)
+# API Keys (in .env file)
+GEMINI_API_KEY=your-key-here
+```
 
 ## FAQ
 
