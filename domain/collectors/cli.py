@@ -145,7 +145,8 @@ class CliCollector:
         """Generate zsh hook script content"""
         log_path = str(self.log_path)
         
-        return f'''#!/bin/zsh
+        # Use format string to avoid complex escaping
+        script = '''#!/bin/zsh
 # Sayu CLI tracking hooks
 
 # Safe sayu preexec hook
@@ -165,9 +166,9 @@ sayu_precmd() {{
     local ts_ms=$((end_time * 1000))
     
     # JSON escape handling (safely)
-    local cmd_safe=${{SAYU_CMD//\"/\\\"}}
+    local cmd_safe=${{SAYU_CMD//"/\\"}}
     cmd_safe=${{cmd_safe//\\/\\\\}}
-    local cwd_safe=${{cwd//\"/\\\"}}
+    local cwd_safe=${{cwd//"/\\"}}
     cwd_safe=${{cwd_safe//\\/\\\\}}
     
     # Create log entry
@@ -185,6 +186,7 @@ autoload -U add-zsh-hook
 add-zsh-hook preexec sayu_preexec
 add-zsh-hook precmd sayu_precmd
 '''
+        return script.format(log_path=log_path)
     
     def _update_zshrc(self):
         """Update .zshrc to source the hook script"""

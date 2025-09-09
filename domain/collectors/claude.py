@@ -182,14 +182,17 @@ class ClaudeCollector:
             cwd = data.get('cwd', '')
             git_branch = data.get('gitBranch', '')
             
+            # Determine the actual repository from cwd
+            actual_repo = self._determine_repo_from_cwd(cwd) if cwd else self.repo_root
+            
             # Create event
             event = Event(
                 id=str(uuid.uuid4()),
                 ts=timestamp_ms,
                 source=EventSource.LLM,
                 kind=EventKind.CHAT,
-                repo=self.repo_root,
-                cwd=cwd or self.repo_root,
+                repo=actual_repo,
+                cwd=cwd or actual_repo,
                 file=None,
                 range=None,
                 actor=actor,
@@ -228,6 +231,26 @@ class ClaudeCollector:
                 print(f"Timestamp parsing error: {e}")
         
         return None
+    
+    def _determine_repo_from_cwd(self, cwd: str) -> str:
+        """Determine repository root from working directory"""
+        if not cwd:
+            return self.repo_root
+        
+        # Try to find git root from cwd
+        import subprocess
+        try:
+            result = subprocess.run(
+                ['git', 'rev-parse', '--show-toplevel'],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            return result.stdout.strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # If not a git repo or git not found, use the cwd itself
+            return cwd
     
     def _extract_text_content(self, message_data: Dict[str, Any]) -> str:
         """Extract text content from Claude message structure"""

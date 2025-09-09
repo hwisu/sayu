@@ -61,8 +61,9 @@ class HookHandlers:
                 # Collect events since last commit (optimized range)
                 recent_events = collector_manager.collect_since_last_commit()
                 
-                # Filter for LLM events (conversations)
-                llm_events = [e for e in recent_events if e.source in [EventSource.LLM]]
+                # Filter for LLM events (conversations) from current repository only
+                llm_events = [e for e in recent_events 
+                             if e.source in [EventSource.LLM] and e.repo == repo_root]
                 
                 # Get current commit context with file diffs
                 git_context = collector_manager.git_collector.get_current_commit_context()
