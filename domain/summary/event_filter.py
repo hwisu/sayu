@@ -4,7 +4,7 @@ import re
 from typing import List
 
 from domain.events.types import Event
-from shared.constants import TextConstants
+from shared.constants import MAX_HIGH_VALUE_EVENTS
 
 
 class EventFilter:
@@ -14,7 +14,7 @@ class EventFilter:
     def filter_high_value_events(events: List[Event]) -> List[Event]:
         """Filter events to get high-value ones"""
         high_value_events = []
-        max_events = TextConstants.MAX_HIGH_VALUE_EVENTS
+        max_events = MAX_HIGH_VALUE_EVENTS
         
         # Reverse to process most recent first, then reverse back
         for event in reversed(events):

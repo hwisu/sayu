@@ -7,7 +7,14 @@ from typing import List, Dict, Any
 from domain.events.types import Event, LLMSummaryResponse
 from infra.api.llm_optimized import OptimizedLLMApiClient as LLMApiClient
 from i18n import i18n
-from shared.constants import TextConstants
+from shared.constants import (
+    MAX_CONVERSATION_COUNT, MAX_CONVERSATION_LENGTH,
+    MAX_SIMPLIFIED_CONVERSATIONS, MAX_SIMPLIFIED_LENGTH,
+    MAX_HIGH_VALUE_EVENTS, MAX_DIFF_LENGTH,
+    MIN_RESPONSE_LENGTH, MAX_RAW_RESPONSE_LENGTH,
+    MAX_COMMIT_TRAILER_LINES, MAX_LINE_LENGTH,
+    MAX_FILE_DISPLAY, SUMMARY_SEPARATOR, SUMMARY_FOOTER
+)
 
 
 class LLMSummaryGenerator:
@@ -31,9 +38,9 @@ class LLMSummaryGenerator:
     @staticmethod
     def generate_simplified(llm_events: List[Event], staged_files: List[str], diff_stats: str) -> str:
         """Generate simplified LLM summary"""
-        recent_conversations = llm_events[-TextConstants.MAX_SIMPLIFIED_CONVERSATIONS:]
+        recent_conversations = llm_events[-MAX_SIMPLIFIED_CONVERSATIONS:]
         conversations_text = '\n'.join([
-            f"[{event.actor.value if event.actor else 'unknown'}]: {event.text[:TextConstants.MAX_SIMPLIFIED_LENGTH]}"
+            f"[{event.actor.value if event.actor else 'unknown'}]: {event.text[:MAX_SIMPLIFIED_LENGTH]}"
             for event in recent_conversations
         ])
         
@@ -55,9 +62,9 @@ class LLMSummaryGenerator:
     @staticmethod
     def _build_prompt(llm_events: List[Event], staged_files: List[str], diff_stats: str) -> str:
         """Build main analysis prompt"""
-        recent_events = llm_events[-TextConstants.MAX_CONVERSATION_COUNT:]
+        recent_events = llm_events[-MAX_CONVERSATION_COUNT:]
         conversations = '\n'.join([
-            f"[{event.actor.value if event.actor else 'unknown'}]: {event.text[:TextConstants.MAX_CONVERSATION_LENGTH]}"
+            f"[{event.actor.value if event.actor else 'unknown'}]: {event.text[:MAX_CONVERSATION_LENGTH]}"
             for event in recent_events
         ])
         
@@ -101,7 +108,7 @@ class LLMSummaryGenerator:
     @staticmethod
     def _wrap_text(text: str, indent: int = 0) -> str:
         """Wrap text to specified line length with indentation, preserving original line breaks"""
-        max_line_length = TextConstants.MAX_LINE_LENGTH
+        max_line_length = MAX_LINE_LENGTH
         indent_str = ' ' * indent
         
         # Split by original line breaks first to preserve LLM's intentional formatting
@@ -142,8 +149,8 @@ class LLMSummaryGenerator:
         lines.append('AI-Context (sayu)')
         
         clean_text = re.sub(r'[\n\r]+', ' ', text).strip()
-        if len(clean_text) > TextConstants.MAX_RAW_RESPONSE_LENGTH:
-            lines.append(f"Summary: {clean_text[:TextConstants.MAX_RAW_RESPONSE_LENGTH]}...")
+        if len(clean_text) > MAX_RAW_RESPONSE_LENGTH:
+            lines.append(f"Summary: {clean_text[:MAX_RAW_RESPONSE_LENGTH]}...")
         else:
             lines.append(f"Summary: {clean_text}")
         
@@ -153,67 +160,123 @@ class LLMSummaryGenerator:
     
     @staticmethod
     def _analyze_conversation_process(llm_events: List[Event]) -> str:
-        """Analyze conversation patterns"""
+        """Analyze conversation patterns to capture development flow"""
         if not llm_events:
-            return "대화 없음: 코드 변경만 수행됨"
+            return "No conversations: Direct code changes only"
         
         analysis = []
         
         user_events = [e for e in llm_events if e.actor and e.actor.value == 'user']
         assistant_events = [e for e in llm_events if e.actor and e.actor.value == 'assistant']
         
-        analysis.append(f"대화 총 {len(llm_events)}회 (사용자: {len(user_events)}, 어시스턴트: {len(assistant_events)})")
+        # Basic conversation stats
+        analysis.append(f"Total {len(llm_events)} exchanges (User: {len(user_events)}, Assistant: {len(assistant_events)})")
         
-        # Questions
-        questions = [e for e in user_events if '?' in e.text or '어떻게' in e.text or '왜' in e.text]
+        # Development flow analysis
+        flow_patterns = []
+        
+        # Initial approach detection
+        if user_events:
+            first_request = user_events[0].text[:100]
+            if any(word in first_request.lower() for word in ['implement', 'create', 'add', 'build', 'fix']):
+                flow_patterns.append("Started with clear implementation goal")
+            elif any(word in first_request.lower() for word in ['why', 'how', 'what', 'debug', 'error']):
+                flow_patterns.append("Started with debugging/investigation")
+        
+        # Questions and clarifications
+        questions = [e for e in user_events if '?' in e.text or any(word in e.text.lower() for word in ['how', 'why', 'what', 'where'])]
         if questions:
-            analysis.append(f"{len(questions)}개의 질문/문의사항 포함")
+            flow_patterns.append(f"{len(questions)} clarification points")
         
-        # Problem solving
-        problem_keywords = ['문제', '오류', '에러', '안됨', '실패', '버그']
+        # Problem solving journey
+        problem_keywords = ['error', 'bug', 'issue', 'problem', 'fail', 'wrong', 'broken', 'not working']
         problem_events = [e for e in llm_events 
-                         if any(keyword in e.text for keyword in problem_keywords)]
+                         if any(keyword in e.text.lower() for keyword in problem_keywords)]
         if problem_events:
-            analysis.append(f"문제 해결 과정: {len(problem_events)}회 언급")
+            flow_patterns.append(f"Encountered {len(problem_events)} challenges")
         
-        # Retries
-        retry_keywords = ['다시', '재시도', '또', '한번 더']
-        retry_events = [e for e in llm_events 
-                       if any(keyword in e.text for keyword in retry_keywords)]
-        if retry_events:
-            analysis.append(f"반복/재시도 과정: {len(retry_events)}회 발생")
+        # Solution attempts
+        solution_keywords = ['try', 'attempt', 'let me', 'how about', 'what if', 'maybe', 'could', 'should']
+        solution_events = [e for e in llm_events 
+                          if any(keyword in e.text.lower() for keyword in solution_keywords)]
+        if solution_events:
+            flow_patterns.append(f"{len(solution_events)} solution attempts")
         
-        # Tool usage
-        tool_events = [e for e in llm_events if '[Tool:' in e.text]
+        # Iterations and refinements
+        iteration_keywords = ['again', 'retry', 'another', 'different', 'instead', 'actually', 'wait']
+        iteration_events = [e for e in llm_events 
+                           if any(keyword in e.text.lower() for keyword in iteration_keywords)]
+        if iteration_events:
+            flow_patterns.append(f"{len(iteration_events)} iterations/refinements")
+        
+        # Tool and resource usage
+        tool_events = [e for e in llm_events if any(marker in e.text for marker in ['[Tool:', 'Running:', 'Executing:', '```'])]
         if tool_events:
-            analysis.append(f"도구 사용: {len(tool_events)}회")
+            flow_patterns.append(f"{len(tool_events)} tool/code executions")
         
-        # Unusual patterns
-        unusual_patterns = []
+        # Documentation/reference mentions
+        doc_keywords = ['documentation', 'docs', 'reference', 'guide', 'example', 'stackoverflow', 'github']
+        doc_events = [e for e in llm_events 
+                     if any(keyword in e.text.lower() for keyword in doc_keywords)]
+        if doc_events:
+            flow_patterns.append(f"Referenced external resources {len(doc_events)} times")
+        
+        # Decision points
+        decision_keywords = ['decided', 'choosing', 'better', 'instead of', 'rather than', 'because', 'since']
+        decision_events = [e for e in llm_events 
+                          if any(keyword in e.text.lower() for keyword in decision_keywords)]
+        if decision_events:
+            flow_patterns.append(f"{len(decision_events)} key decisions made")
+        
+        # Testing and verification
+        test_keywords = ['test', 'verify', 'check', 'confirm', 'ensure', 'validate']
+        test_events = [e for e in llm_events 
+                      if any(keyword in e.text.lower() for keyword in test_keywords)]
+        if test_events:
+            flow_patterns.append(f"{len(test_events)} verification steps")
+        
+        # Session characteristics
+        session_info = []
         
         if len(llm_events) > 50:
-            unusual_patterns.append(f"장시간 세션 ({len(llm_events)}회 대화)")
+            session_info.append(f"Extended session ({len(llm_events)} exchanges)")
+        elif len(llm_events) < 10:
+            session_info.append("Quick resolution")
         
-        short_responses = [e for e in user_events if len(e.text) < 10]
-        if len(short_responses) > 3:
-            unusual_patterns.append(f"짧은 응답 연속 ({len(short_responses)}회)")
+        # Complexity indicators
+        if problem_events and len(problem_events) > 5:
+            session_info.append("Complex debugging process")
         
-        # Keyword analysis
-        all_text = ' '.join(e.text for e in llm_events)
-        keyword_counts = {}
-        for keyword in ['최적화', '성능', '버그', '테스트', '리팩토링']:
-            count = len(re.findall(keyword, all_text))
-            if count > 3:
-                keyword_counts[keyword] = count
+        if iteration_events and len(iteration_events) > 3:
+            session_info.append("Multiple approach changes")
         
-        if keyword_counts:
-            keywords = ', '.join(f"{word}({count}회)" for word, count in keyword_counts.items())
-            unusual_patterns.append(f"반복 키워드: {keywords}")
+        # Key topics analysis
+        all_text = ' '.join(e.text for e in llm_events).lower()
+        topic_keywords = {
+            'performance': ['performance', 'optimize', 'speed', 'efficiency', 'memory'],
+            'architecture': ['structure', 'design', 'pattern', 'refactor', 'organize'],
+            'debugging': ['debug', 'error', 'exception', 'stacktrace', 'logs'],
+            'testing': ['test', 'unit', 'integration', 'coverage', 'assert'],
+            'configuration': ['config', 'setting', 'environment', 'setup', 'install']
+        }
         
-        if unusual_patterns:
-            analysis.append(f"특이점: {', '.join(unusual_patterns)}")
+        main_topics = []
+        for topic, keywords in topic_keywords.items():
+            count = sum(1 for keyword in keywords if keyword in all_text)
+            if count > 2:
+                main_topics.append(topic)
         
-        return ' / '.join(analysis)
+        if main_topics:
+            session_info.append(f"Focus areas: {', '.join(main_topics)}")
+        
+        # Combine all analysis
+        if flow_patterns:
+            analysis.append(f"Development flow: {' → '.join(flow_patterns)}")
+        
+        if session_info:
+            analysis.append(f"Session: {', '.join(session_info)}")
+        
+        return ' | '.join(analysis)
     
     @staticmethod
     def _extract_json_from_response(response: str) -> str:

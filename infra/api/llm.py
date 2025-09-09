@@ -7,7 +7,11 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-from shared.constants import LLMConstants
+from shared.constants import (
+    LLM_TEMPERATURE, LLM_MAX_OUTPUT_TOKENS,
+    OPENAI_TEMPERATURE, OPENAI_MAX_TOKENS,
+    ANTHROPIC_TEMPERATURE, ANTHROPIC_MAX_TOKENS
+)
 from shared.utils import ShellExecutor
 
 
@@ -51,8 +55,8 @@ class LLMApiClient:
                 }]
             }],
             "generationConfig": {
-                "temperature": LLMConstants.TEMPERATURE,
-                "maxOutputTokens": LLMConstants.MAX_OUTPUT_TOKENS,
+                "temperature": LLM_TEMPERATURE,
+                "maxOutputTokens": LLM_MAX_OUTPUT_TOKENS,
                 "candidateCount": 1,
                 "responseMimeType": "application/json"
             }
@@ -98,8 +102,8 @@ class LLMApiClient:
         payload = {
             "model": "gpt-3.5-turbo",
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": LLMConstants.OPENAI_MAX_TOKENS,
-            "temperature": LLMConstants.OPENAI_TEMPERATURE
+            "max_tokens": OPENAI_MAX_TOKENS,
+            "temperature": OPENAI_TEMPERATURE
         }
         
         # Use temporary file for payload
@@ -140,9 +144,9 @@ class LLMApiClient:
         
         payload = {
             "model": "claude-3-haiku-20240307",
-            "max_tokens": LLMConstants.ANTHROPIC_MAX_TOKENS,
+            "max_tokens": ANTHROPIC_MAX_TOKENS,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": LLMConstants.ANTHROPIC_TEMPERATURE
+            "temperature": ANTHROPIC_TEMPERATURE
         }
         
         # Use temporary file for payload
