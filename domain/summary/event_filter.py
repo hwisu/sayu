@@ -4,7 +4,7 @@ import re
 from typing import List
 
 from domain.events.types import Event
-from shared.constants import MAX_HIGH_VALUE_EVENTS
+from shared.constants import MAX_HIGH_VALUE_EVENTS, MIN_RESPONSE_LENGTH
 
 
 class EventFilter:
@@ -47,7 +47,7 @@ class EventFilter:
                 return False
             
             # Skip short responses
-            if len(text) < TextConstants.MIN_RESPONSE_LENGTH:
+            if len(text) < MIN_RESPONSE_LENGTH:
                 return False
             
             # Skip low-value patterns

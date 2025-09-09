@@ -81,35 +81,8 @@ class ConnectorConfig:
     cursor: bool = True
     editor: bool = True
     cli: Dict[str, str] = field(default_factory=lambda: {'mode': 'zsh-preexec'})
-    browser: Dict[str, str] = field(default_factory=lambda: {'mode': 'off'})
     git: bool = True
 
-
-@dataclass
-class WindowConfig:
-    """Time window configuration"""
-    beforeCommitHours: int = 168  # One week
-
-
-@dataclass
-class FilterConfig:
-    """Filter configuration"""
-    domainAllowlist: List[str] = field(default_factory=lambda: [
-        'github.com',
-        'developer.mozilla.org', 
-        'stackoverflow.com'
-    ])
-    noise: Dict[str, Any] = field(default_factory=lambda: {
-        'graceMinutes': 5,
-        'minScore': 0.6
-    })
-
-
-@dataclass
-class SummarizerConfig:
-    """Summarizer configuration"""
-    mode: Literal['rules', 'llm', 'hybrid'] = 'hybrid'
-    maxLines: Dict[str, int] = field(default_factory=lambda: {'commit': 12})
 
 
 @dataclass
@@ -126,16 +99,12 @@ class PrivacyConfig:
 class OutputConfig:
     """Output configuration"""
     commitTrailer: bool = True
-    gitNotes: bool = False
 
 
 @dataclass
 class Config:
     """Main configuration"""
     connectors: ConnectorConfig = field(default_factory=ConnectorConfig)
-    window: WindowConfig = field(default_factory=WindowConfig)
-    filter: FilterConfig = field(default_factory=FilterConfig)
-    summarizer: SummarizerConfig = field(default_factory=SummarizerConfig)
     privacy: PrivacyConfig = field(default_factory=PrivacyConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
 
@@ -183,9 +152,8 @@ class EventRow:
 class LLMSummaryResponse:
     """LLM summary response"""
     intent: Optional[str] = None
-    changes: Optional[str] = None
-    approach: Optional[str] = None
-    context: Optional[str] = None
+    what_changed: Optional[str] = None
+    conversation_flow: Optional[str] = None
 
 
 @dataclass

@@ -7,26 +7,6 @@ connectors:
   editor: true
   cli:
     mode: "zsh-preexec"   # or "atuin" | "off"
-  browser:
-    mode: "off"           # or "extension" | "activitywatch"
-
-window:
-  beforeCommitHours: 24    # 커밋 전 몇 시간의 이벤트를 수집할지
-
-filter:
-  domainAllowlist:
-    - "github.com"
-    - "developer.mozilla.org"
-    - "stackoverflow.com"
-  noise:
-    graceMinutes: 5       # 커밋 전후 여유 시간
-    minScore: 0.6         # 최소 관련성 점수
-
-summarizer:
-  mode: "hybrid"          # "rules" | "llm" | "hybrid"
-  maxLines:
-    commit: 12            # 커밋 메시지 트레일러 최대 줄 수
-    notes: 25             # git notes 최대 줄 수
 
 privacy:
   maskSecrets: true       # 민감정보 마스킹 여부
@@ -36,5 +16,3 @@ privacy:
 
 output:
   commitTrailer: true     # 커밋 메시지에 트레일러 추가
-  gitNotes: true          # git notes 생성
-  notesRef: "refs/notes/sayu"

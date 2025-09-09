@@ -44,7 +44,7 @@ DEFAULT_SECURITY_MASKS: Final[List[str]] = [
 ]
 
 # Summary formatting constants
-SUMMARY_SEPARATOR: Final[str] = '---\nAI-Context (sayu)\n\n'
+SUMMARY_SEPARATOR: Final[str] = '---\n思惟\n\n'
 SUMMARY_FOOTER: Final[str] = '\n---'
 
 

@@ -6,7 +6,7 @@ from typing import Optional, Dict, Any
 import yaml
 
 from domain.events.types import Config, UserConfig
-from shared.constants import DEFAULT_SECURITY_MASKS
+from shared import constants
 
 
 class ConfigManager:
@@ -60,41 +60,59 @@ class ConfigManager:
         """Get full configuration for backward compatibility"""
         user_config = self.get_user_config()
         
+        # Load full config from .sayu.yml if exists
+        config_path = self.repo_root / self.CONFIG_FILE
+        raw_config = {}
+        if config_path.exists():
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    raw_config = yaml.safe_load(f) or {}
+            except Exception:
+                pass
+        
         return Config(
-            connectors={
+            connectors=raw_config.get('connectors', {
                 'claude': True,
                 'cursor': True,
                 'editor': True,
                 'cli': {'mode': 'zsh-preexec'},
-                'browser': {'mode': 'off'},
                 'git': True
-            },
-            window={'beforeCommitHours': 24},
-            filter={
-                'domainAllowlist': [
-                    'github.com',
-                    'developer.mozilla.org',
-                    'stackoverflow.com'
-                ],
-                'noise': {'graceMinutes': 5, 'minScore': 0.6}
-            },
-            summarizer={
-                'mode': 'hybrid',
-                'maxLines': {'commit': 12}
-            },
-            privacy={
+            }),
+            privacy=raw_config.get('privacy', {
                 'maskSecrets': False,
-                'masks': list(DEFAULT_SECURITY_MASKS)
-            },
-            output={
-                'commitTrailer': user_config.commitTrailer,
-                'gitNotes': False
-            }
+                'masks': list(constants.DEFAULT_SECURITY_MASKS)
+            }),
+            output=raw_config.get('output', {
+                'commitTrailer': user_config.commitTrailer
+            })
         )
     
     def get_effective_config(self) -> UserConfig:
         """Get effective user configuration"""
         return self.get_user_config()
+    
+    def get_constants(self) -> Dict[str, Any]:
+        """Get constants - no longer overridable via config"""
+        # Return hardcoded constants
+        return {
+            'DEFAULT_LOOKBACK_HOURS': constants.DEFAULT_LOOKBACK_HOURS,
+            'MAX_COMMIT_TRAILER_LINES': constants.MAX_COMMIT_TRAILER_LINES,
+            'CACHE_TTL_SECONDS': constants.CACHE_TTL_SECONDS,
+            'COLLECTOR_TIMEOUT_MS': constants.COLLECTOR_TIMEOUT_MS,
+            'MAX_CONVERSATION_COUNT': constants.MAX_CONVERSATION_COUNT,
+            'MAX_CONVERSATION_LENGTH': constants.MAX_CONVERSATION_LENGTH,
+            'MAX_SIMPLIFIED_CONVERSATIONS': constants.MAX_SIMPLIFIED_CONVERSATIONS,
+            'MAX_SIMPLIFIED_LENGTH': constants.MAX_SIMPLIFIED_LENGTH,
+            'MAX_HIGH_VALUE_EVENTS': constants.MAX_HIGH_VALUE_EVENTS,
+            'MIN_RESPONSE_LENGTH': constants.MIN_RESPONSE_LENGTH,
+            'MAX_RAW_RESPONSE_LENGTH': constants.MAX_RAW_RESPONSE_LENGTH,
+            'MAX_FILE_DISPLAY': constants.MAX_FILE_DISPLAY,
+            'MAX_LINE_LENGTH': constants.MAX_LINE_LENGTH,
+            'LLM_TEMPERATURE': constants.LLM_TEMPERATURE,
+            'LLM_MAX_OUTPUT_TOKENS': constants.LLM_MAX_OUTPUT_TOKENS,
+            'SUMMARY_SEPARATOR': constants.SUMMARY_SEPARATOR,
+            'SUMMARY_FOOTER': constants.SUMMARY_FOOTER
+        }
     
     def save(self, new_config: Dict[str, Any]):
         """Save updated configuration"""
@@ -121,24 +139,28 @@ class ConfigManager:
             return
         
         default_content = """# Sayu Configuration
-# AI automatically collects your development context
+# 커밋에 '왜'를 남기는 개인 로컬 블랙박스
 
-# Enable Sayu (set to false to disable)
-enabled: true
+connectors:
+  claude: true
+  cursor: true
+  editor: true
+  cli:
+    mode: "zsh-preexec"   # or "atuin" | "off"
 
-# Language setting (ko: Korean, en: English)
-language: ko
+privacy:
+  maskSecrets: true       # 민감정보 마스킹 여부
+  masks:                  # 추가 마스킹 패턴 (정규식)
+    - "AKIA[0-9A-Z]{16}"  # AWS Access Key
+    - "(?i)authorization:\\s*Bearer\\s+[A-Za-z0-9._-]+"
 
-# Add AI context to commit messages
-commitTrailer: true
+output:
+  commitTrailer: true     # 커밋 메시지에 트레일러 추가
 
-# Can also be configured via environment variables:
+# 환경 변수로도 설정 가능:
 # SAYU_ENABLED=false
 # SAYU_LANG=en
 # SAYU_TRAILER=false
-#
-# LLM API keys in .env file:
-# GEMINI_API_KEY=your-key
 """
         
         with open(config_path, 'w', encoding='utf-8') as f:
