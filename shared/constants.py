@@ -1,44 +1,43 @@
 """Sayu system constants and default values"""
 
+from enum import Enum
 from typing import Final, List
 
-# Time-related constants (in milliseconds/hours/minutes)
-class TimeConstants:
-    COMMIT_WINDOW_HOURS: Final[int] = 24
-    GRACE_PERIOD_MINUTES: Final[int] = 5
-    DEFAULT_LOOKBACK_HOURS: Final[int] = 168  # One week
+# Time-related constants
+COMMIT_WINDOW_HOURS: Final[int] = 24
+GRACE_PERIOD_MINUTES: Final[int] = 5
+DEFAULT_LOOKBACK_HOURS: Final[int] = 168  # One week
+CACHE_TTL_SECONDS: Final[int] = 300
+COLLECTOR_TIMEOUT_MS: Final[int] = 5000
 
 # Text processing constants
-class TextConstants:
-    MAX_CONVERSATION_COUNT: Final[int] = 20
-    MAX_CONVERSATION_LENGTH: Final[int] = 800
-    MAX_SIMPLIFIED_CONVERSATIONS: Final[int] = 10
-    MAX_SIMPLIFIED_LENGTH: Final[int] = 400
-    MAX_HIGH_VALUE_EVENTS: Final[int] = 80
-    MAX_DIFF_LENGTH: Final[int] = 2000
-    MIN_RESPONSE_LENGTH: Final[int] = 50
-    MAX_COMMIT_TRAILER_LINES: Final[int] = 12
-    MAX_LINE_LENGTH: Final[int] = 80
-    MAX_RAW_RESPONSE_LENGTH: Final[int] = 2000
-    MAX_FILE_DISPLAY: Final[int] = 3
+MAX_CONVERSATION_COUNT: Final[int] = 20
+MAX_CONVERSATION_LENGTH: Final[int] = 800
+MAX_SIMPLIFIED_CONVERSATIONS: Final[int] = 10
+MAX_SIMPLIFIED_LENGTH: Final[int] = 400
+MAX_HIGH_VALUE_EVENTS: Final[int] = 80
+MAX_DIFF_LENGTH: Final[int] = 2000
+MIN_RESPONSE_LENGTH: Final[int] = 50
+MAX_COMMIT_TRAILER_LINES: Final[int] = 12
+MAX_LINE_LENGTH: Final[int] = 80
+MAX_RAW_RESPONSE_LENGTH: Final[int] = 2000
+MAX_FILE_DISPLAY: Final[int] = 3
 
 # LLM API constants
-class LLMConstants:
-    TEMPERATURE: Final[float] = 0.1
-    MAX_OUTPUT_TOKENS: Final[int] = 8192
-    OPENAI_TEMPERATURE: Final[float] = 0.3
-    OPENAI_MAX_TOKENS: Final[int] = 1000
-    ANTHROPIC_TEMPERATURE: Final[float] = 0.3
-    ANTHROPIC_MAX_TOKENS: Final[int] = 1000
+LLM_TEMPERATURE: Final[float] = 0.1
+LLM_MAX_OUTPUT_TOKENS: Final[int] = 8192
+OPENAI_TEMPERATURE: Final[float] = 0.3
+OPENAI_MAX_TOKENS: Final[int] = 1000
+ANTHROPIC_TEMPERATURE: Final[float] = 0.3
+ANTHROPIC_MAX_TOKENS: Final[int] = 1000
 
 # Filtering constants
-class FilterConstants:
-    MIN_RELEVANCE_SCORE: Final[float] = 0.6
-    DEFAULT_DOMAIN_ALLOWLIST: Final[List[str]] = [
-        'github.com',
-        'developer.mozilla.org',
-        'stackoverflow.com'
-    ]
+MIN_RELEVANCE_SCORE: Final[float] = 0.6
+DEFAULT_DOMAIN_ALLOWLIST: Final[List[str]] = [
+    'github.com',
+    'developer.mozilla.org',
+    'stackoverflow.com'
+]
 
 # Default security masking patterns
 DEFAULT_SECURITY_MASKS: Final[List[str]] = [
@@ -47,3 +46,14 @@ DEFAULT_SECURITY_MASKS: Final[List[str]] = [
     r'(?i)api[_-]?key[\'"\\s]*[:=][\'"\\s]*[A-Za-z0-9]{20,}',  # API key
     r'(?i)secret[\'"\\s]*[:=][\'"\\s]*[A-Za-z0-9]{10,}',  # Secret
 ]
+
+# Summary formatting constants
+SUMMARY_SEPARATOR: Final[str] = '---\nAI-Context (sayu)\n\n'
+SUMMARY_FOOTER: Final[str] = '\n---'
+
+
+class CollectorMode(Enum):
+    """Collector operation modes"""
+    OFF = "off"
+    READ = "read"
+    WRITE = "write"

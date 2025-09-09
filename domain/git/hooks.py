@@ -33,9 +33,25 @@ class GitHookManager:
 # Sayu Git Hook - {hook_name}
 # Auto-generated, do not edit
 
-# Run Sayu hook handler
+# Try to find sayu in various locations
 if command -v sayu >/dev/null 2>&1; then
+    # Found in PATH (pipx, uvx, or global install)
     sayu hook {hook_name} "$@"
+elif [ -f "$HOME/.local/bin/sayu" ]; then
+    # pipx default location
+    "$HOME/.local/bin/sayu" hook {hook_name} "$@"
+elif [ -f "$HOME/.cargo/bin/uvx" ] && "$HOME/.cargo/bin/uvx" --version >/dev/null 2>&1; then
+    # Try uvx
+    "$HOME/.cargo/bin/uvx" sayu hook {hook_name} "$@"
+elif command -v uvx >/dev/null 2>&1; then
+    # uvx in PATH
+    uvx sayu hook {hook_name} "$@"
+elif command -v pipx >/dev/null 2>&1; then
+    # Try pipx run as fallback
+    pipx run sayu hook {hook_name} "$@"
+elif command -v python3 >/dev/null 2>&1; then
+    # Fallback to Python module
+    python3 -m sayu hook {hook_name} "$@" 2>/dev/null || true
 fi
 
 # Always exit 0 to avoid blocking commits (fail-open)

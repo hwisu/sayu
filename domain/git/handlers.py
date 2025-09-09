@@ -8,6 +8,7 @@ from datetime import datetime
 
 from shared.utils import CliUtils
 from infra.config.manager import ConfigManager
+from infra.cache.manager import CacheManager
 from domain.events.store_manager import StoreManager
 from infra.api.llm import LLMApiClient
 
@@ -153,6 +154,17 @@ class HookHandlers:
                 )
                 
                 store.insert(event)
+                
+                # Clean up old cache files after successful commit
+                try:
+                    cache_manager = CacheManager(repo_root)
+                    cleaned = cache_manager.cleanup_old_cache(max_age_seconds=3600)  # Clean files older than 1 hour
+                    
+                    if os.getenv('SAYU_DEBUG') and cleaned > 0:
+                        print(f"Cleaned up {cleaned} old cache files after commit")
+                except Exception:
+                    # Don't fail if cache cleanup fails
+                    pass
                 
         except Exception as e:
             # Fail silently

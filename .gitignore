@@ -22,6 +22,8 @@ wheels/
 MANIFEST
 *.manifest
 *.spec
+.sayu
+
 
 # Virtual environments
 venv/

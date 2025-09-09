@@ -1,19 +1,25 @@
 """Optimized LLM API client using httpx for better performance"""
 
+import hashlib
 import json
 import os
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
+
 import httpx
 
-from shared.constants import LLMConstants
+from shared.constants import (
+    LLM_TEMPERATURE, LLM_MAX_OUTPUT_TOKENS,
+    OPENAI_TEMPERATURE, OPENAI_MAX_TOKENS,
+    ANTHROPIC_TEMPERATURE, ANTHROPIC_MAX_TOKENS
+)
 
 
 class OptimizedLLMApiClient:
     """Optimized LLM API client with httpx and caching"""
     
     # Simple in-memory cache for API responses
-    _cache: Dict[str, tuple[str, float]] = {}
+    _cache: Dict[str, Tuple[str, float]] = {}
     CACHE_TTL = 300  # 5 minutes
     
     @classmethod
@@ -45,7 +51,7 @@ class OptimizedLLMApiClient:
     @classmethod
     def _get_cached(cls, prompt: str) -> Optional[str]:
         """Get cached response if available and not expired"""
-        cache_key = hash(prompt)
+        cache_key = cls._generate_cache_key(prompt)
         if cache_key in cls._cache:
             response, timestamp = cls._cache[cache_key]
             if time.time() - timestamp < cls.CACHE_TTL:
@@ -55,10 +61,15 @@ class OptimizedLLMApiClient:
         return None
     
     @classmethod
-    def _set_cache(cls, prompt: str, response: str):
+    def _set_cache(cls, prompt: str, response: str) -> None:
         """Cache a response"""
-        cache_key = hash(prompt)
+        cache_key = cls._generate_cache_key(prompt)
         cls._cache[cache_key] = (response, time.time())
+    
+    @classmethod
+    def _generate_cache_key(cls, prompt: str) -> str:
+        """Generate stable cache key using MD5 hash"""
+        return hashlib.md5(prompt.encode()).hexdigest()
     
     @classmethod
     def _call_gemini(cls, prompt: str) -> str:
@@ -76,8 +87,8 @@ class OptimizedLLMApiClient:
                 }]
             }],
             "generationConfig": {
-                "temperature": LLMConstants.TEMPERATURE,
-                "maxOutputTokens": LLMConstants.MAX_OUTPUT_TOKENS,
+                "temperature": LLM_TEMPERATURE,
+                "maxOutputTokens": LLM_MAX_OUTPUT_TOKENS,
                 "candidateCount": 1,
                 "responseMimeType": "application/json"
             }
@@ -112,8 +123,8 @@ class OptimizedLLMApiClient:
         payload = {
             "model": "gpt-3.5-turbo",
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 1000,
-            "temperature": 0.3
+            "max_tokens": OPENAI_MAX_TOKENS,
+            "temperature": OPENAI_TEMPERATURE
         }
         
         with httpx.Client(timeout=30.0) as client:
@@ -144,8 +155,8 @@ class OptimizedLLMApiClient:
         payload = {
             "model": "claude-3-haiku-20240307",
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 1000,
-            "temperature": 0.3
+            "max_tokens": ANTHROPIC_MAX_TOKENS,
+            "temperature": ANTHROPIC_TEMPERATURE
         }
         
         with httpx.Client(timeout=30.0) as client:

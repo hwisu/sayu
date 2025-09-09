@@ -27,7 +27,7 @@ class CliUtils:
             sys.exit(1)
     
     @staticmethod
-    def handle_error(context: str, error: Exception):
+    def handle_error(context: str, error: Exception) -> None:
         """Handle CLI errors with nice formatting"""
         print(f"❌ Error during {context}:")
         print(str(error))

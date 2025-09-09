@@ -1,224 +1,177 @@
-# Sayu - AI-Powered Commit Context Tracker
+# Sayu - AI와 함께한 코딩 과정을 자동으로 기록
 
-> Automatically capture the "why" behind your code changes using LLM conversation history
+> Cursor와 Claude로 코딩할 때 나눈 대화를 분석해 커밋 메시지에 자동으로 추가
 
-## Purpose
+## 왜 Sayu가 필요한가요?
 
-Over time, the reasoning behind code changes gets lost. Sayu automatically analyzes your **Claude/Cursor LLM conversations** at commit time to record the **intent, approach, and context** of your changes in structured Korean summaries.
+AI와 함께 코딩하면서 "이 코드를 왜 이렇게 짰더라?" 하고 까먹은 적 있나요? 
+Sayu는 여러분이 Cursor나 Claude와 나눈 대화를 분석해서, 코드 변경의 맥락을 커밋 메시지에 자동으로 추가합니다.
 
-## Key Features
+## 주요 기능
 
-- **🤖 LLM Conversation Collection**: Auto-extract Claude and Cursor conversation logs
-- **🧠 Smart Filtering**: Utility-based selection of important conversations (93% noise reduction)
-- **🇰🇷 Korean Context**: LLM analyzes intent/changes/approach/context in Korean
-- **🔍 Conversation Analysis**: Automatic detection of question patterns, problem-solving processes, and anomalies
-- **🛡️ Empty Commit Validation**: Blocks meaningless commits while allowing configuration changes
-- **🔐 Local-First**: All data stored locally (privacy protected)
-- **⚡ Fail-Open**: Hook failures don't block commits
+- **🤖 AI 대화 자동 수집**: Cursor와 Claude Desktop의 대화 내용을 자동으로 가져옵니다
+- **🧠 스마트 필터링**: 중요한 대화만 추려냅니다 (노이즈 93% 제거)
+- **⚡ 빠른 분석**: 커밋할 때 2-3초 안에 AI가 대화 내용을 요약합니다
+- **🔐 프라이버시**: 모든 데이터는 로컬에만 저장됩니다
+- **🛡️ 안전한 동작**: 문제가 생겨도 커밋은 막지 않습니다
 
-## Installation
+## 설치
 
 ```bash
-# Install dependencies
-npm install
+# pipx로 설치 (추천)
+pipx install sayu
 
-# Build the project
-npm run build
+# 또는 pip로 설치
+pip install sayu
 
-# Initialize Sayu in your repository
-node dist/cli/index.js init
-```
-
-## Usage
-
-### Initialize
-```bash
-# Run in your Git repository
+# 저장소에서 Sayu 초기화
 sayu init
 ```
 
-This command:
-- Creates `.sayu.yml` configuration file
-- Installs Git hooks (commit-msg, post-commit)
-- Initializes local SQLite database (`~/.sayu/events.db`)
+## 사용법
 
-### Check Status
+### 1. 초기화
 ```bash
-sayu health
+# Git 저장소에서 실행
+sayu init
 ```
 
-### Commit
-Commit as usual and LLM conversation analysis will be automatically added:
+이 명령어는:
+- Git 훅을 설치합니다 (commit-msg, post-commit)
+- 로컬 데이터베이스를 만듭니다 (`~/.sayu/events.db`)
+- 기본 설정 파일을 생성합니다 (`.sayu.yml`)
 
-```bash
-git add .
-git commit -m "Fix authentication bug"
-```
+### 2. API 키 설정 (.env)
 
-Result:
-```
-Fix authentication bug
-
----
-AI-Context (sayu)
-Intent: 사용자 인증 버그 수정을 통해 로그인 실패 문제 해결
-Changes: auth.js의 토큰 검증 로직 수정, test/auth.test.js에 새로운 테스트 케이스 추가
-Approach: JWT 디코딩 함수의 예외 처리를 개선하고 만료된 토큰 감지 로직 강화
-Context: Claude와의 대화에서 토큰 만료 시 에러 처리 방식에 대한 논의와 테스트 케이스 작성 과정 포함
----
-```
-
-## Configuration (.sayu.yml)
-
-```yaml
-connectors:
-  claude: true      # ✅ Collect Claude conversation logs (~/.claude/projects/)
-  cursor: true      # ✅ Collect Cursor conversation DB (~/Library/Application Support/Cursor/)
-  cli:              # ✅ Track CLI commands
-    mode: "zsh-preexec"  # "zsh-preexec" | "atuin" | "off"
-  git: true         # ✅ Collect Git events
-
-window:
-  beforeCommitHours: 168  # Time range to collect (one week, considering Friday→Monday gaps)
-
-output:
-  commitTrailer: true    # Add trailer to commit messages
-  gitNotes: false       # Create git notes (planned)
-
-privacy:
-  maskSecrets: false     # Mask sensitive information
-  masks: []             # Patterns to mask
-```
-
-## API Key Setup (.env)
-
-Set one of these API keys for LLM summary generation:
+다음 중 하나의 API 키를 설정하세요:
 
 ```bash
-# Gemini (recommended)
+# Gemini (추천 - 빠르고 저렴)
 GEMINI_API_KEY=your_api_key_here
 
-# Or OpenAI
+# 또는 OpenAI
 OPENAI_API_KEY=your_api_key_here
 
-# Or Anthropic
+# 또는 Anthropic
 ANTHROPIC_API_KEY=your_api_key_here
 ```
 
-## Architecture
-
-```
-[LLM Collectors] → [Smart Filter] → [LLM Analysis] → [Git Hooks]
-       ↓                ↓              ↓              ↓
-Claude/Cursor → Utility-based → Gemini/GPT/Claude → Commit Trailer
-    Logs         Selection      Korean Summary      Intent/Changes/
-                (93% reduction)   + Process        Approach/Context
-                                 Analysis
-```
-
-### Processing Flow
-1. **Collection**: Extract conversations from Claude JSONL, Cursor SQLite
-2. **Filtering**: Remove low-utility events (tool usage, confirmation messages)
-3. **Analysis**: LLM analyzes conversation patterns, problem-solving processes, anomalies
-4. **Summary**: Generate structured Korean Intent/Changes/Approach/Context
-
-## Project Structure
-
-```
-sayu/
-├── src/
-│   ├── core/           # Core modules
-│   │   ├── types.ts              # Type definitions
-│   │   ├── database.ts           # SQLite event store
-│   │   ├── config.ts             # Configuration management
-│   │   ├── git-hooks.ts          # Git hook management
-│   │   ├── hook-handlers.ts      # 🔥 Main logic (LLM summary, filtering)
-│   │   ├── collector-manager.ts  # Collector integration
-│   │   └── utils.ts              # Utilities
-│   ├── collectors/     # Event collectors
-│   │   ├── git.ts               # Git events
-│   │   ├── llm-claude.ts        # 🤖 Claude conversations (JSONL)
-│   │   └── llm-cursor.ts        # 🤖 Cursor conversations (SQLite)
-│   └── cli/           # CLI commands
-│       └── index.ts             # CLI entry point
-├── dist/              # Build output
-├── .env               # API key configuration
-└── .sayu.yml          # Project configuration
-```
-
-## Data Sources
-
-### LLM Conversation Collection
-- **Claude**: `~/.claude/projects/{repo}/` JSONL files
-- **Cursor**: `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`
-
-### Local Database Storage
-Events are stored in `~/.sayu/events.db`:
-
-```sql
-CREATE TABLE events (
-  id TEXT PRIMARY KEY,
-  ts INTEGER,           -- Timestamp
-  source TEXT,          -- 'git', 'llm'
-  kind TEXT,            -- 'commit', 'chat'
-  repo TEXT,            -- Repository path
-  cwd TEXT,             -- Working directory
-  file TEXT,            -- Related file
-  range TEXT,           -- Code range
-  actor TEXT,           -- 'user', 'assistant'
-  text TEXT,            -- Event content
-  url TEXT,             -- URL (if available)
-  meta TEXT             -- JSON metadata
-);
-```
-
-## Testing
+### 3. 평소처럼 커밋하기
 
 ```bash
-# Build
-npm run build
-
-# Preview current changes
-sayu preview
-
-# Check system status
-sayu health
-
-# CLI tracking management
-sayu cli install    # Install zsh hook
-sayu cli uninstall  # Remove zsh hook
+git add .
+git commit -m "인증 버그 수정"
 ```
 
-## Roadmap
+자동으로 이런 커밋 메시지가 만들어집니다:
+```
+인증 버그 수정
 
-- [x] **Phase 1**: Core infrastructure (DB, Git hooks, config)
-- [x] **Phase 2**: Git collector and rule-based summaries  
-- [x] **Phase 3**: LLM collectors (Claude, Cursor) ✨
-- [x] **Phase 4**: Intelligent LLM summaries (Gemini/GPT/Claude) ✨
-- [x] **Phase 5**: Smart filtering & Korean responses ✨
-- [x] **Phase 6**: Conversation analysis & anomaly detection ✨
-- [ ] **Phase 7**: CLI/Editor collectors
-- [ ] **Phase 8**: Browser activity collection
-- [ ] **Phase 9**: Git notes integration
+---
+AI-Context (sayu)
 
-## Performance Features
+Intent:
+  JWT 토큰 검증 로직의 버그를 수정하여 로그인 실패 문제 해결
 
-- **93% noise reduction**: 1200 events → 80 core events filtering
-- **Real-time processing**: LLM analysis completed within 2-3 seconds per commit
-- **Memory efficient**: Limited to 2-hour range, prevents excessive data collection
-- **Safe failure**: Falls back to simplified summaries on API failures
+Changes:
+  auth.js의 토큰 디코딩 예외 처리 개선
+  test/auth.test.js에 만료된 토큰 테스트 케이스 추가
 
-## Target Users
+Context:
+  Claude와 토큰 만료 시 에러 처리 방식에 대해 논의했고, 
+  예외 처리를 더 세밀하게 만들어야 한다는 결론을 내림.
+  테스트 코드 작성 과정에서 여러 엣지 케이스를 발견하고 수정함.
+---
+```
 
-- Optimized for **macOS + Cursor + Claude** users
-- Korean development teams/developers
-- LLM-based development workflow users
-- Teams that value commit history quality
+## 명령어
 
-## Contributing
+```bash
+# 시스템 상태 확인
+sayu health
 
-PRs and issues are welcome!
+# 현재 변경사항의 AI 컨텍스트 미리보기
+sayu preview
 
-## License
+# CLI 트래킹 설치/제거 (zsh)
+sayu collector cli-install
+sayu collector cli-uninstall
+```
+
+## 설정 (.sayu.yml)
+
+```yaml
+# 어떤 도구에서 대화를 수집할지
+connectors:
+  claude: true      # Claude Desktop 대화 수집
+  cursor: true      # Cursor 대화 수집
+  cli:              # 터미널 명령어 수집
+    mode: "off"     # "zsh-preexec" | "off"
+
+# 얼마나 과거의 대화를 볼지 (시간 단위)
+window:
+  beforeCommitHours: 168  # 일주일 (금요일→월요일 고려)
+
+# 커밋 메시지에 추가할지
+commitTrailer: true
+
+# 언어 설정
+language: "ko"  # "ko" | "en"
+
+# 개인정보 보호
+privacy:
+  maskSecrets: true
+  masks: []  # 숨길 패턴들
+```
+
+## 설정 가능한 상수들
+
+`shared/constants.py`에서 다음 값들을 조정할 수 있습니다:
+
+### 시간 관련
+- `COMMIT_WINDOW_HOURS`: 24 (커밋 시점 기준 몇 시간 전까지 볼지)
+- `DEFAULT_LOOKBACK_HOURS`: 168 (기본 수집 기간, 1주일)
+- `CACHE_TTL_SECONDS`: 300 (캐시 유효 시간)
+
+### 텍스트 처리
+- `MAX_CONVERSATION_COUNT`: 20 (최대 대화 수)
+- `MAX_CONVERSATION_LENGTH`: 800 (대화당 최대 길이)
+- `MAX_DIFF_LENGTH`: 2000 (diff 최대 길이)
+- `MIN_RESPONSE_LENGTH`: 50 (최소 응답 길이)
+
+### LLM API
+- `LLM_TEMPERATURE`: 0.1 (창의성 수준, 낮을수록 일관성 높음)
+- `LLM_MAX_OUTPUT_TOKENS`: 8192 (최대 출력 토큰)
+
+## FAQ
+
+### Q: 새로운 AI 도구 (예: GitHub Copilot)의 대화도 수집하고 싶어요
+A: `domain/collectors/` 폴더에 새 수집기를 만드세요:
+
+1. 기존 수집기 (claude.py, cursor.py) 참고해서 새 파일 생성
+2. `pull_since()` 메서드 구현 (시간 범위 내 대화 수집)
+3. `discover()` 메서드 구현 (도구가 설치됐는지 확인)
+4. `domain/collectors/manager.py`에 새 수집기 등록
+
+### Q: 다른 언어로 요약받고 싶어요
+A: `.sayu.yml`에서 `language`를 변경하거나, `i18n/prompts/`에 새 언어 추가
+
+### Q: 캐시가 너무 많이 쌓여요
+A: 커밋할 때마다 1시간 이상된 캐시는 자동 정리됩니다. 수동으로 정리하려면 `rm -rf .sayu/cache/`
+
+### Q: 민감한 정보가 커밋 메시지에 들어갈까 걱정돼요
+A: `.sayu.yml`의 `privacy.maskSecrets`를 `true`로 설정하고, `masks`에 정규식 패턴 추가
+
+## 타겟 사용자
+
+- **Cursor + Claude**로 코딩하는 개발자
+- AI와의 대화 내용을 기록으로 남기고 싶은 팀
+- 커밋 히스토리의 품질을 중요하게 생각하는 팀
+
+## 기여하기
+
+이슈와 PR은 언제나 환영합니다!
+
+## 라이선스
 
 MIT
