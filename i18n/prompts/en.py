@@ -7,7 +7,7 @@ def main_analysis(conversations: str, staged_files: List[str], diff_stats: str, 
     """Main LLM analysis prompt in English"""
     files_str = ', '.join(staged_files)
     
-    return f"""Analyze this commit to capture the complete development trail.
+    return f"""Analyze this commit to provide effective context for future development.
 
 ## 🗂 Changed Files:
 {files_str}
@@ -21,21 +21,19 @@ def main_analysis(conversations: str, staged_files: List[str], diff_stats: str, 
 ## 📈 Conversation Pattern Analysis:
 {process_analysis}
 
-**IMPORTANT: Return only valid JSON. No markdown, no code blocks, no explanations. Only JSON output.**
+**Core Principles:**
+- Focus on capturing context that would help understand this commit in the future
+- Include both successful and failed attempts to show the full development process
+- Document the "why" behind changes, not just the "what"
 
-**CRITICAL INSTRUCTIONS FOR FULL TRAIL COVERAGE:**
-1. Capture the complete journey, not just the final result
-2. Include ALL attempted approaches, even if they didn't work
-3. Document key decision points and rationale
-4. Preserve important error messages or debugging insights
-5. Note any external references, documentation, or resources consulted
-6. Include any performance considerations or trade-offs discussed
+Return JSON with these three key aspects:
 
-Response format (valid JSON only):
 {{
-  "intent": "The initial problem/goal and how understanding evolved during development. Include any pivots or refinements in approach",
-  "changes": "Complete list of modifications including: files changed, specific methods/functions affected, configuration changes, test additions, and any refactoring done. Be specific about WHAT changed and WHERE", 
-  "context": "Full development trail including: initial approach, challenges encountered, solutions tried, debugging process, key insights discovered, decisions made and why, any remaining considerations or follow-up items. This should tell the complete story of how this code came to be"
+  "what_changed": "Comprehensive list of all changes made in this commit. Include specific files, functions, logic modifications, and their locations. Be detailed and precise.",
+  
+  "conversation_flow": "The development journey from the conversations. How did the discussion evolve? What approaches were tried? What challenges arose and how were they addressed? Include key decision points.",
+  
+  "intent": "The purpose behind these changes. If explicitly stated in conversations, quote it. Otherwise, infer from the context. Why was this work necessary? What problem does it solve?"
 }}
 
 JSON response:"""
@@ -45,7 +43,7 @@ def simplified_analysis(conversations: str, staged_files: List[str], diff_stats:
     """Simplified retry prompt in English"""
     files_str = ', '.join(staged_files)
     
-    return f"""Analyze this commit focusing on the development flow:
+    return f"""Provide a concise commit analysis for context.
 
 ## 💬 Conversations:
 {conversations}
@@ -56,15 +54,12 @@ def simplified_analysis(conversations: str, staged_files: List[str], diff_stats:
 ## 📊 Changes:
 {diff_stats}
 
-**IMPORTANT: Return only valid JSON. No markdown or explanations. JSON only.**
+Return a brief JSON summary:
 
-**FOCUS: Capture the development flow concisely but completely**
-
-Response format (valid JSON only):
 {{
-  "intent": "Initial problem → final goal (show evolution)",
-  "changes": "File changes with specific locations and modifications",
-  "context": "Development flow: start → challenges → solutions → outcome"
+  "what_changed": "Key modifications made (files, functions, logic)",
+  "conversation_flow": "How the development discussion progressed",
+  "intent": "Purpose of changes (explicit or inferred)"
 }}
 
 JSON response:"""

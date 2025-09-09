@@ -65,7 +65,7 @@ class LLMApiClient:
                 '-H', 'Content-Type: application/json',
                 '-H', f'x-goog-api-key: {api_key}',
                 '-d', f'@{temp_file}',
-                f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+                f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent'
             ]
             
             result = ShellExecutor.run(cmd, ccheck=True)
