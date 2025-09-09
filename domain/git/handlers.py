@@ -62,8 +62,15 @@ class HookHandlers:
                 recent_events = collector_manager.collect_since_last_commit()
                 
                 # Filter for LLM events (conversations) from current repository only
-                llm_events = [e for e in recent_events 
-                             if e.source in [EventSource.LLM] and e.repo == repo_root]
+                # More strict filtering: only include if repo exactly matches current repo
+                llm_events = []
+                for e in recent_events:
+                    if e.source in [EventSource.LLM]:
+                        # Only include if the event repo exactly matches current repo
+                        if e.repo and os.path.abspath(e.repo) == os.path.abspath(repo_root):
+                            llm_events.append(e)
+                        elif os.getenv('SAYU_DEBUG'):
+                            print(f"Filtering out event from different repo: {e.repo} != {repo_root}")
                 
                 # Get current commit context with file diffs
                 git_context = collector_manager.git_collector.get_current_commit_context()

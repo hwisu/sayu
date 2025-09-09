@@ -183,7 +183,13 @@ class ClaudeCollector:
             git_branch = data.get('gitBranch', '')
             
             # Determine the actual repository from cwd
-            actual_repo = self._determine_repo_from_cwd(cwd) if cwd else self.repo_root
+            # Only use conversations from valid git repos
+            actual_repo = self._determine_repo_from_cwd(cwd)
+            if not actual_repo:
+                # Skip conversations not in a git repository
+                if os.getenv('SAYU_DEBUG'):
+                    print(f"Skipping conversation - no valid git repo found for cwd: {cwd}")
+                continue
             
             # Create event
             event = Event(
@@ -235,7 +241,7 @@ class ClaudeCollector:
     def _determine_repo_from_cwd(self, cwd: str) -> str:
         """Determine repository root from working directory"""
         if not cwd:
-            return self.repo_root
+            return None  # Return None instead of self.repo_root
         
         # Try to find git root from cwd
         import subprocess
@@ -247,10 +253,16 @@ class ClaudeCollector:
                 text=True,
                 check=True
             )
-            return result.stdout.strip()
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            # If not a git repo or git not found, use the cwd itself
-            return cwd
+            repo_path = result.stdout.strip()
+            
+            # Only return the repo if it exists and is a directory
+            if repo_path and os.path.isdir(repo_path):
+                return repo_path
+            return None
+        except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+            # If not a git repo, git not found, or cwd doesn't exist
+            # Return None to indicate this conversation is not from a git repo
+            return None
     
     def _extract_text_content(self, message_data: Dict[str, Any]) -> str:
         """Extract text content from Claude message structure"""

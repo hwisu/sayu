@@ -72,7 +72,7 @@ class LLMApiClient:
                 'curl', '-s', '-X', 'POST',
                 '-H', 'Content-Type: application/json',
                 '-d', f'@{temp_file}',
-                f'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}'
+                f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}'
             ]
             
             result = ShellExecutor.run(cmd, check=True)
