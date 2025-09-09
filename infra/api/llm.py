@@ -71,11 +71,12 @@ class LLMApiClient:
             cmd = [
                 'curl', '-s', '-X', 'POST',
                 '-H', 'Content-Type: application/json',
+                '-H', f'x-goog-api-key: {api_key}',
                 '-d', f'@{temp_file}',
-                f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}'
+                f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
             ]
             
-            result = ShellExecutor.run(cmd, check=True)
+            result = ShellExecutor.run(cmd, ccheck=True)
             response = json.loads(result.stdout)
             
             if response.get('candidates') and response['candidates'][0]:
