@@ -86,19 +86,22 @@ class LLMSummaryGenerator:
         lines.append(outputs['trailer_header'])
         lines.append('')
         
+        # Handle intent
         if parsed.get('intent'):
             lines.append(outputs['trailer_labels']['intent'])
             lines.append(LLMSummaryGenerator._wrap_text(parsed['intent'], 2))
             lines.append('')
         
-        if parsed.get('changes'):
+        # Handle what_changed
+        if parsed.get('what_changed'):
             lines.append(outputs['trailer_labels']['changes'])
-            lines.append(LLMSummaryGenerator._wrap_text(parsed['changes'], 2))
+            lines.append(LLMSummaryGenerator._wrap_text(parsed['what_changed'], 2))
             lines.append('')
         
-        if parsed.get('context'):
+        # Handle conversation_flow
+        if parsed.get('conversation_flow'):
             lines.append(outputs['trailer_labels']['context'])
-            lines.append(LLMSummaryGenerator._wrap_text(parsed['context'], 2))
+            lines.append(LLMSummaryGenerator._wrap_text(parsed['conversation_flow'], 2))
             lines.append('')
         
         lines.append('---')

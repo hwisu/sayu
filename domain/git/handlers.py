@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime
 
-from shared.utils import CliUtils
+from shared.utils import CliUtils, ProgressTracker
 from infra.config.manager import ConfigManager
 from infra.cache.manager import CacheManager
 from domain.events.store_manager import StoreManager
@@ -19,12 +19,19 @@ class HookHandlers:
     @staticmethod
     def handle_commit_msg(msg_file: str):
         """Handle commit-msg hook"""
+        # Show progress only when not in quiet mode
+        show_progress = os.getenv('GIT_QUIET') != '1' and os.getenv('SAYU_QUIET') != '1'
+        progress = ProgressTracker(enabled=show_progress)
+        
         try:
+            progress.step("Initializing Sayu...", "🚀")
+            
             repo_root = CliUtils.get_git_root()
             if not repo_root:
                 return
             
             # Load config
+            progress.step("Loading configuration...", "📋")
             config_manager = ConfigManager(repo_root)
             config = config_manager.get_user_config()
             
@@ -32,6 +39,7 @@ class HookHandlers:
                 return
             
             # Read commit message
+            progress.step("Reading commit message...", "📝")
             with open(msg_file, 'r') as f:
                 original_msg = f.read()
             
@@ -40,6 +48,7 @@ class HookHandlers:
                 return
             
             # Get staged files and diff
+            progress.step("Analyzing changes...", "🔍")
             staged_files = CliUtils.get_staged_files()
             if not staged_files:
                 return  # Nothing staged
@@ -56,13 +65,15 @@ class HookHandlers:
                 import time
                 
                 # Initialize collector manager
+                progress.step("Initializing collectors...", "🔧")
                 collector_manager = CollectorManager(repo_root)
                 
                 # Collect events since last commit (optimized range)
+                progress.step("Collecting development context...", "📊")
                 recent_events = collector_manager.collect_since_last_commit()
                 
                 # Filter for LLM events (conversations) from current repository only
-                # More strict filtering: only include if repo exactly matches current repo
+                progress.step(f"Processing {len(recent_events)} events...", "⚡")
                 llm_events = []
                 for e in recent_events:
                     if e.source in [EventSource.LLM]:
@@ -95,6 +106,7 @@ class HookHandlers:
                     llm_events.append(diff_event)
                 
                 # Generate structured summary
+                progress.step("Generating AI context with LLM...", "🤖")
                 if llm_events:
                     summary = LLMSummaryGenerator.generate(llm_events, staged_files, diff_stats['stat_output'])
                 else:
@@ -103,20 +115,29 @@ class HookHandlers:
                 
                 if summary and config.commitTrailer:
                     # Append AI context to commit message
+                    progress.step("Updating commit message...", "✏️")
                     enhanced_msg = f"{original_msg.rstrip()}\n\n{summary}\n"
                     
                     with open(msg_file, 'w') as f:
                         f.write(enhanced_msg)
+                    
+                    progress.finish("AI context added successfully")
                         
             except Exception as e:
                 # Fail silently - don't block commit
+                progress.step(f"Warning: {str(e)}", "⚠️")
                 if os.getenv('SAYU_DEBUG'):
                     print(f"Summary generation failed: {e}")
+                    import traceback
+                    traceback.print_exc()
                     
         except Exception as e:
             # Fail-open: Never block commits
+            progress.step(f"Error: {str(e)}", "❌")
             if os.getenv('SAYU_DEBUG'):
                 print(f"Hook error: {e}")
+                import traceback
+                traceback.print_exc()
     
     @staticmethod
     def handle_post_commit():

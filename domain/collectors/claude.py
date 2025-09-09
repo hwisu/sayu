@@ -68,13 +68,28 @@ class ClaudeCollector:
             return events
         
         try:
-            # Scan all project directories
-            for project_dir in self.claude_projects_path.iterdir():
-                if project_dir.is_dir():
-                    project_events = self._extract_from_project(
-                        project_dir, since_ms, until_ms
-                    )
-                    events.extend(project_events)
+            # Convert repo path to Claude project folder name
+            # e.g., /Users/hwisookim/sayu -> -Users-hwisookim-sayu
+            project_folder_name = self.repo_root.replace('/', '-')
+            if project_folder_name.startswith('-'):
+                project_folder_name = project_folder_name[1:]  # Remove leading dash
+            if project_folder_name:
+                project_folder_name = '-' + project_folder_name  # Add leading dash back
+            
+            # Only check the project directory for current repo
+            target_project_dir = self.claude_projects_path / project_folder_name
+            
+            if target_project_dir.exists() and target_project_dir.is_dir():
+                if os.getenv('SAYU_DEBUG'):
+                    print(f"Checking Claude project: {target_project_dir.name}")
+                
+                project_events = self._extract_from_project(
+                    target_project_dir, since_ms, until_ms
+                )
+                events.extend(project_events)
+            else:
+                if os.getenv('SAYU_DEBUG'):
+                    print(f"No Claude project found for repo: {self.repo_root}")
         
         except Exception as e:
             if os.getenv('SAYU_DEBUG'):
@@ -182,14 +197,9 @@ class ClaudeCollector:
             cwd = data.get('cwd', '')
             git_branch = data.get('gitBranch', '')
             
-            # Determine the actual repository from cwd
-            # Only use conversations from valid git repos
-            actual_repo = self._determine_repo_from_cwd(cwd)
-            if not actual_repo:
-                # Skip conversations not in a git repository
-                if os.getenv('SAYU_DEBUG'):
-                    print(f"Skipping conversation - no valid git repo found for cwd: {cwd}")
-                return None
+            # Since we're already in the correct project folder for this repo,
+            # we can assume all conversations belong to this repo
+            actual_repo = self.repo_root
             
             # Create event
             event = Event(

@@ -3,8 +3,10 @@
 import os
 import sys
 import subprocess
+import time
 from pathlib import Path
 from typing import Optional, List, Dict, Any
+from datetime import datetime
 
 
 class CliUtils:
@@ -141,6 +143,45 @@ class CliUtils:
         """Wrap text to specified width"""
         import textwrap
         return textwrap.fill(text, width=width, break_long_words=False)
+
+
+class ProgressTracker:
+    """Track and display progress for long-running operations"""
+    
+    def __init__(self, enabled: bool = True):
+        self.enabled = enabled
+        self.start_time = time.time()
+        self.last_step_time = self.start_time
+        
+    def step(self, message: str, emoji: str = "⚙️") -> None:
+        """Display a progress step with timing"""
+        if not self.enabled:
+            return
+            
+        current_time = time.time()
+        step_duration = current_time - self.last_step_time
+        total_duration = current_time - self.start_time
+        
+        # Format timing info
+        if step_duration > 0.1:  # Only show if took more than 100ms
+            timing = f" ({step_duration:.1f}s)"
+        else:
+            timing = ""
+            
+        # Print with timestamp
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        print(f"[{timestamp}] {emoji} {message}{timing}", file=sys.stderr)
+        
+        self.last_step_time = current_time
+    
+    def finish(self, message: str = "Complete") -> None:
+        """Display final timing"""
+        if not self.enabled:
+            return
+            
+        total_duration = time.time() - self.start_time
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        print(f"[{timestamp}] ✅ {message} (total: {total_duration:.1f}s)", file=sys.stderr)
 
 
 class ShellExecutor:

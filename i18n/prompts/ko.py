@@ -7,7 +7,7 @@ def main_analysis(conversations: str, staged_files: List[str], diff_stats: str, 
     """Main LLM analysis prompt in Korean"""
     files_str = ', '.join(staged_files)
     
-    return f"""이번 커밋의 전체 개발 과정을 분석해주세요.
+    return f"""이 커밋의 효과적인 맥락을 제공하기 위해 분석하세요.
 
 ## 🗂 변경된 파일:
 {files_str}
@@ -21,21 +21,19 @@ def main_analysis(conversations: str, staged_files: List[str], diff_stats: str, 
 ## 📈 대화 패턴 분석:
 {process_analysis}
 
-**IMPORTANT: 반드시 유효한 JSON만 반환하세요. 마크다운 없이, 코드 블록 없이, 설명 없이 오직 JSON만 출력하세요.**
+**핵심 원칙:**
+- 나중에 이 커밋을 이해하는 데 도움이 될 맥락 포착에 집중
+- 전체 개발 과정을 보여주기 위해 성공과 실패한 시도 모두 포함
+- "무엇을" 했는지뿐만 아니라 "왜" 했는지를 문서화
 
-**전체 개발 흐름 파악을 위한 핵심 지침:**
-1. 최종 결과뿐 아니라 과정 전체를 담아주세요
-2. 시도했던 모든 접근 방법을 포함 (실패한 것도 포함)
-3. 주요 결정 지점과 그 이유를 기록
-4. 중요한 에러 메시지나 디버깅 과정의 통찰을 보존
-5. 참고한 외부 문서나 리소스가 있다면 언급
-6. 성능이나 트레이드오프에 대한 고려사항 포함
+다음 세 가지 핵심 측면으로 JSON을 반환하세요:
 
-Response format (valid JSON only):
 {{
-  "intent": "초기 문제/목표와 개발 중 이해가 어떻게 발전했는지. 접근 방식의 전환이나 개선 포함",
-  "changes": "완전한 변경 목록: 변경된 파일, 영향받은 메서드/함수, 설정 변경, 테스트 추가, 리팩토링 내용. 무엇이 어디서 변경되었는지 구체적으로", 
-  "context": "전체 개발 흐름: 초기 접근 → 직면한 문제 → 시도한 해결책 → 디버깅 과정 → 핵심 발견사항 → 의사결정과 근거 → 남은 고려사항. 이 코드가 만들어진 전체 스토리"
+  "what_changed": "이 커밋에서 만들어진 모든 변경 사항의 포괄적인 목록. 구체적인 파일, 함수, 로직 수정 사항과 위치를 포함하세요. 상세하고 정확하게.",
+  
+  "conversation_flow": "대화에서 나타난 개발 여정. 논의가 어떻게 진행되었나? 어떤 접근법을 시도했나? 어떤 도전이 있었고 어떻게 해결했나? 주요 결정 지점 포함.",
+  
+  "intent": "이러한 변경의 목적. 대화에서 명시적으로 언급되었다면 인용하고, 그렇지 않다면 맥락에서 추론. 왜 이 작업이 필요했나? 어떤 문제를 해결하나?"
 }}
 
 JSON response:"""
@@ -45,7 +43,7 @@ def simplified_analysis(conversations: str, staged_files: List[str], diff_stats:
     """Simplified retry prompt in Korean"""
     files_str = ', '.join(staged_files)
     
-    return f"""이번 커밋의 개발 흐름을 간결하게 분석해주세요:
+    return f"""맥락을 위한 간결한 커밋 분석을 제공하세요.
 
 ## 💬 대화:
 {conversations}
@@ -56,15 +54,12 @@ def simplified_analysis(conversations: str, staged_files: List[str], diff_stats:
 ## 📊 변경사항:
 {diff_stats}
 
-**IMPORTANT: 오직 유효한 JSON만 반환하세요. 마크다운이나 설명 없이 JSON만 출력하세요.**
+간단한 JSON 요약 반환:
 
-**핵심: 간결하지만 개발 흐름이 완전히 드러나도록**
-
-Response format (valid JSON only):
 {{
-  "intent": "초기 문제 → 최종 목표 (발전 과정 표현)",
-  "changes": "파일별 구체적 위치와 변경 내용", 
-  "context": "개발 흐름: 시작 → 도전과제 → 해결책 → 결과"
+  "what_changed": "주요 수정 사항 (파일, 함수, 로직)",
+  "conversation_flow": "개발 논의가 어떻게 진행되었는지",
+  "intent": "변경의 목적 (명시적이거나 추론된)"
 }}
 
 JSON response:"""
