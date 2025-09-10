@@ -68,6 +68,16 @@ pub enum Commands {
         #[arg(long)]
         collect: bool,
     },
+    
+    /// Show conversations that contributed to a specific commit
+    Commit {
+        /// Git commit hash
+        hash: String,
+        
+        /// Show verbose output with full details
+        #[arg(short = 'v', long)]
+        verbose: bool,
+    },
 }
 
 #[derive(Clone, clap::ValueEnum)]
@@ -86,6 +96,7 @@ pub async fn run() -> Result<()> {
         Commands::Show { count } => show_command(count).await,
         Commands::Uninstall => uninstall_command().await,
         Commands::List { count, source, verbose, collect } => list_command(count, source, verbose, collect).await,
+        Commands::Commit { hash, verbose } => commit_command(hash, verbose).await,
     }
 }
 
@@ -453,6 +464,162 @@ async fn list_command(count: usize, source: Option<String>, verbose: bool, colle
     Ok(())
 }
 
+async fn commit_command(hash: String, verbose: bool) -> Result<()> {
+    let repo_root = get_git_repo_root()?;
+    let storage = Storage::new(&repo_root)?;
+    
+    // Get commit information
+    let output = Command::new("git")
+        .args(["log", "-1", "--format=%H|%ct|%s|%an", &hash])
+        .current_dir(&repo_root)
+        .output()
+        .context("Failed to get commit information")?;
+    
+    if !output.status.success() {
+        anyhow::bail!("Commit {} not found", hash);
+    }
+    
+    let commit_info = String::from_utf8(output.stdout)?;
+    let parts: Vec<&str> = commit_info.trim().split('|').collect();
+    
+    if parts.len() < 4 {
+        anyhow::bail!("Failed to parse commit information");
+    }
+    
+    let full_hash = parts[0];
+    let timestamp_secs: i64 = parts[1].parse().context("Failed to parse timestamp")?;
+    let commit_msg = parts[2];
+    let author = parts[3];
+    
+    // Convert to milliseconds
+    let commit_timestamp = timestamp_secs * 1000;
+    
+    // Get the previous commit timestamp to set the range
+    let prev_output = Command::new("git")
+        .args(["log", "-1", "--format=%ct", &format!("{}^", hash)])
+        .current_dir(&repo_root)
+        .output()
+        .ok();
+    
+    let since_timestamp = if let Some(output) = prev_output {
+        if output.status.success() {
+            String::from_utf8(output.stdout)
+                .ok()
+                .and_then(|s| s.trim().parse::<i64>().ok())
+                .map(|ts| ts * 1000)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    
+    // Get events in the time range (from previous commit to this commit)
+    let events = if let Some(since_ts) = since_timestamp {
+        storage.get_events_between(since_ts, commit_timestamp)?
+    } else {
+        // If no previous commit, get all events before this commit
+        storage.get_events_before(commit_timestamp)?
+    };
+    
+    // Display commit information
+    println!("{}", "📝 Commit Information".bold());
+    println!("{}", "─".repeat(100));
+    println!("{:<15} {}", "Hash:".bold(), full_hash);
+    println!("{:<15} {}", "Author:".bold(), author);
+    println!("{:<15} {}", "Date:".bold(), 
+        chrono::DateTime::from_timestamp_millis(commit_timestamp)
+            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+            .unwrap_or_else(|| "Unknown".to_string()));
+    println!("{:<15} {}", "Message:".bold(), commit_msg);
+    println!();
+    
+    if events.is_empty() {
+        println!("No related conversations found for this commit.");
+        return Ok(());
+    }
+    
+    println!("{} {} related conversations found", "📚".bold(), events.len());
+    println!("{}", "─".repeat(100));
+    
+    if verbose {
+        // Verbose output with full details
+        for (idx, event) in events.iter().enumerate() {
+            let time = chrono::DateTime::from_timestamp_millis(event.id)
+                .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+                .unwrap_or_else(|| "Unknown".to_string());
+            
+            println!("\n{} Conversation #{}", "▶".cyan(), idx + 1);
+            println!("{:<15} {}", "Time:".bold(), time);
+            println!("{:<15} {:?}", "Source:".bold(), event.source);
+            println!("{:<15} {:?}", "Type:".bold(), event.kind);
+            
+            if let Some(actor) = &event.actor {
+                println!("{:<15} {:?}", "Actor:".bold(), actor);
+            }
+            
+            if let Some(file) = event.meta.get("file").and_then(|v| v.as_str()) {
+                println!("{:<15} {}", "File:".bold(), file);
+            }
+            
+            if let Some(cwd) = event.meta.get("cwd").and_then(|v| v.as_str()) {
+                println!("{:<15} {}", "Directory:".bold(), cwd);
+            }
+            
+            println!("{:<15}", "Content:".bold());
+            for line in event.text.lines().take(20) {
+                println!("    {}", line);
+            }
+            if event.text.lines().count() > 20 {
+                println!("    ... ({} more lines)", event.text.lines().count() - 20);
+            }
+        }
+    } else {
+        // Table format for concise output
+        println!("{:<20} {:<12} {:<12} {}",
+                 "Time".bold(),
+                 "Source".bold(),
+                 "Type".bold(),
+                 "Content".bold());
+        println!("{}", "─".repeat(100));
+        
+        for event in &events {
+            let time = chrono::DateTime::from_timestamp_millis(event.id)
+                .map(|dt| dt.format("%m-%d %H:%M").to_string())
+                .unwrap_or_else(|| "Unknown".to_string());
+            
+            let source = match &event.source {
+                EventSource::Claude => "claude".cyan(),
+                EventSource::Cursor => "cursor".magenta(),
+                EventSource::Shell => "shell".yellow(),
+                EventSource::Git => "git".green(),
+            };
+            
+            let kind = format!("{:?}", event.kind).to_lowercase();
+            
+            // Truncate text for summary
+            let summary = if event.text.chars().count() > 55 {
+                let truncated: String = event.text.chars().take(55).collect();
+                format!("{}...", truncated)
+            } else {
+                event.text.clone()
+            }
+            .replace('\n', " ");
+            
+            println!("{:<20} {:<12} {:<12} {}",
+                     time,
+                     source,
+                     kind,
+                     summary);
+        }
+        
+        println!("{}", "─".repeat(100));
+        println!("Use -v for detailed view of conversations.");
+    }
+    
+    Ok(())
+}
+
 async fn uninstall_command() -> Result<()> {
     let repo_root = get_git_repo_root()?;
     
@@ -545,6 +712,7 @@ async fn handle_commit_msg(repo_root: &Path, msg_file: &str) -> Result<()> {
     let language = config.get_language();
     
     // Get last commit timestamp to filter events
+    // Collect events since the last commit (events between last commit and now)
     let last_commit_ts = get_last_commit_timestamp(repo_root).unwrap_or(0);
     
     if std::env::var("SAYU_DEBUG").is_ok() {
@@ -554,6 +722,7 @@ async fn handle_commit_msg(repo_root: &Path, msg_file: &str) -> Result<()> {
                 .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
                 .unwrap_or_else(|| "Unknown".to_string())
         );
+        println!("Collecting events since last commit");
     }
     
     // Collect events from all sources in parallel

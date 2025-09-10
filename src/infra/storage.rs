@@ -180,6 +180,34 @@ impl Storage {
         Ok(events)
     }
     
+    pub fn get_events_between(&self, since_ts: i64, until_ts: i64) -> Result<Vec<Event>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, source, kind, repo, text, actor, meta, branch
+             FROM events
+             WHERE id > ?1 AND id <= ?2
+             ORDER BY id ASC"
+        )?;
+        
+        let events = stmt.query_map(params![since_ts, until_ts], Self::row_to_event)?
+            .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(events)
+    }
+    
+    pub fn get_events_before(&self, until_ts: i64) -> Result<Vec<Event>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, source, kind, repo, text, actor, meta, branch
+             FROM events
+             WHERE id <= ?1
+             ORDER BY id ASC"
+        )?;
+        
+        let events = stmt.query_map(params![until_ts], Self::row_to_event)?
+            .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(events)
+    }
+    
     fn row_to_event(row: &rusqlite::Row) -> rusqlite::Result<Event> {
         let source_str: String = row.get(1)?;
         let kind_str: String = row.get(2)?;
