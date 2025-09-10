@@ -270,12 +270,15 @@ async fn show_command(count: usize) -> Result<()> {
     } else {
         for event in events {
             println!("{}", "─".repeat(60));
-            println!("Time: {}", chrono::DateTime::from_timestamp_millis(event.ts)
+            println!("Time: {}", chrono::DateTime::from_timestamp_millis(event.id)
                 .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
                 .unwrap_or_else(|| "Unknown".to_string()));
             println!("Source: {:?}, Kind: {:?}", event.source, event.kind);
             if let Some(actor) = &event.actor {
                 println!("Actor: {actor:?}");
+            }
+            if let Some(branch) = &event.branch {
+                println!("Branch: {}", branch);
             }
             println!("Text: {}", event.text);
         }
@@ -302,7 +305,7 @@ async fn list_command(count: usize, source: Option<String>, verbose: bool) -> Re
     if verbose {
         // Verbose output with full details
         for event in events {
-            let time = chrono::DateTime::from_timestamp_millis(event.ts)
+            let time = chrono::DateTime::from_timestamp_millis(event.id)
                 .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
                 .unwrap_or_else(|| "Unknown".to_string());
             
@@ -315,11 +318,12 @@ async fn list_command(count: usize, source: Option<String>, verbose: bool) -> Re
                 println!("{:<12} {:?}", "Actor:".bold(), actor);
             }
             
-            if let Some(file) = &event.file {
+            // Show file and directory info from metadata if available
+            if let Some(file) = event.meta.get("file").and_then(|v| v.as_str()) {
                 println!("{:<12} {}", "File:".bold(), file);
             }
             
-            if let Some(cwd) = &event.cwd {
+            if let Some(cwd) = event.meta.get("cwd").and_then(|v| v.as_str()) {
                 println!("{:<12} {}", "Directory:".bold(), cwd);
             }
             
@@ -343,7 +347,7 @@ async fn list_command(count: usize, source: Option<String>, verbose: bool) -> Re
         println!("{}", "─".repeat(100));
         
         for event in &events {
-            let time = chrono::DateTime::from_timestamp_millis(event.ts)
+            let time = chrono::DateTime::from_timestamp_millis(event.id)
                 .map(|dt| dt.format("%m-%d %H:%M").to_string())
                 .unwrap_or_else(|| "Unknown".to_string());
             
@@ -509,6 +513,24 @@ async fn handle_commit_msg(repo_root: &Path, msg_file: &str) -> Result<()> {
         all_events.extend(events);
     }
     
+    // Store collected events to database
+    let storage = Storage::new(repo_root)?;
+    let mut total_stored = 0;
+    
+    for event in &all_events {
+        if let Err(e) = storage.save_event(event) {
+            if std::env::var("SAYU_DEBUG").is_ok() {
+                println!("Failed to save event: {}", e);
+            }
+        } else {
+            total_stored += 1;
+        }
+    }
+    
+    if total_stored > 0 && std::env::var("SAYU_DEBUG").is_ok() {
+        println!("Stored {} events to database", total_stored);
+    }
+    
     // If no events collected, skip
     if all_events.is_empty() {
         if std::env::var("SAYU_DEBUG").is_ok() {
@@ -532,12 +554,18 @@ async fn handle_commit_msg(repo_root: &Path, msg_file: &str) -> Result<()> {
     
     // Add diff as a special event if not empty
     if !diff_output.is_empty() {
-        let diff_event = Event::new(
+        let mut diff_event = Event::new(
             EventSource::Git,
             EventKind::Diff,
             "git-diff".to_string(),
             format!("Changed files:\n{}", diff_output),
         );
+        
+        // Add branch information
+        if let Some(branch) = get_current_branch(repo_root) {
+            diff_event = diff_event.with_branch(branch);
+        }
+        
         all_events.push(diff_event);
     }
     
@@ -598,6 +626,24 @@ fn get_last_commit_timestamp(repo_root: &Path) -> Option<i64> {
     }
 }
 
+fn get_current_branch(repo_root: &Path) -> Option<String> {
+    let output = Command::new("git")
+        .args(["branch", "--show-current"])
+        .current_dir(repo_root)
+        .output()
+        .ok()?;
+    
+    if output.status.success() {
+        String::from_utf8(output.stdout)
+            .ok()?
+            .trim()
+            .to_string()
+            .into()
+    } else {
+        None
+    }
+}
+
 async fn handle_post_commit(repo_root: &Path) -> Result<()> {
     // Store the commit event
     let storage = Storage::new(repo_root)?;
@@ -616,12 +662,17 @@ async fn handle_post_commit(repo_root: &Path) -> Result<()> {
             .and_then(|s| s.to_str())
             .unwrap_or("unknown");
         
-        let event = Event::new(
+        let mut event = Event::new(
             EventSource::Git,
             EventKind::Commit,
             repo_name.to_string(),
             parts[1].to_string(), // commit message
         );
+        
+        // Add branch information
+        if let Some(branch) = get_current_branch(repo_root) {
+            event = event.with_branch(branch);
+        }
         
         storage.save_event(&event)?;
         

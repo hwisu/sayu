@@ -182,8 +182,7 @@ impl ClaudeCollector {
                         text,
                     );
                     
-                    event.ts = timestamp;
-                    event = event.with_actor(actor);
+                    event = event.with_timestamp(timestamp).with_actor(actor);
                     
                     // Add metadata
                     if let Some(uuid) = msg.uuid {
@@ -203,13 +202,13 @@ impl ClaudeCollector {
         if let Some(since) = since_ts {
             if self.debug {
                 let before = events.len();
-                events.retain(|e| e.ts >= since);
+                events.retain(|e| e.id >= since);
                 let after = events.len();
                 if before != after {
                     println!("Claude: Filtered {} -> {} events (since {})", before, after, since);
                 }
             } else {
-                events.retain(|e| e.ts >= since);
+                events.retain(|e| e.id >= since);
             }
         }
         
@@ -247,7 +246,7 @@ impl Collector for ClaudeCollector {
         }
         
         // Sort by timestamp
-        all_events.sort_by_key(|e| e.ts);
+        all_events.sort_by_key(|e| e.id);
         
         Ok(all_events)
     }

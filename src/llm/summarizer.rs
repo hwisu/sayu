@@ -42,7 +42,7 @@ impl EventSummarizer {
     
     fn filter_relevant_events(&self, mut events: Vec<Event>) -> Vec<Event> {
         // Sort by timestamp (most recent first)
-        events.sort_by(|a, b| b.ts.cmp(&a.ts));
+        events.sort_by(|a, b| b.id.cmp(&a.id));
         
         // Take only the most recent events
         events.truncate(MAX_EVENTS);

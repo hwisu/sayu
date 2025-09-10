@@ -1,7 +1,6 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -30,20 +29,17 @@ pub enum Actor {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Event {
-    pub id: String,
+    pub id: i64,  // timestamp mills as primary key
     pub source: EventSource,
     pub kind: EventKind,
     pub repo: String,
     pub text: String,
-    pub ts: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub actor: Option<Actor>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub file: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cwd: Option<String>,
     #[serde(default)]
     pub meta: HashMap<String, serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
 }
 
 impl Event {
@@ -53,17 +49,16 @@ impl Event {
         repo: String,
         text: String,
     ) -> Self {
+        let timestamp = Utc::now().timestamp_millis();
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: timestamp,
             source,
             kind,
             repo,
             text,
-            ts: Utc::now().timestamp_millis(),
             actor: None,
-            file: None,
-            cwd: None,
             meta: HashMap::new(),
+            branch: None,
         }
     }
 
@@ -72,18 +67,18 @@ impl Event {
         self
     }
 
-    pub fn with_file(mut self, file: String) -> Self {
-        self.file = Some(file);
-        self
-    }
-
-    pub fn with_cwd(mut self, cwd: String) -> Self {
-        self.cwd = Some(cwd);
-        self
-    }
-
     pub fn with_meta(mut self, key: String, value: serde_json::Value) -> Self {
         self.meta.insert(key, value);
+        self
+    }
+
+    pub fn with_branch(mut self, branch: String) -> Self {
+        self.branch = Some(branch);
+        self
+    }
+
+    pub fn with_timestamp(mut self, timestamp: i64) -> Self {
+        self.id = timestamp;
         self
     }
 }

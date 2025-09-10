@@ -151,8 +151,7 @@ impl CursorCollector {
                                     content.to_string(),
                                 );
                                 
-                                event.ts = timestamp;
-                                event = event.with_actor(actor);
+                                event = event.with_timestamp(timestamp).with_actor(actor);
                                 
                                 // Add metadata
                                 if let Some(bubble_id) = bubble_data.get("id").and_then(|id| id.as_str()) {
@@ -205,7 +204,7 @@ impl Collector for CursorCollector {
         }
         
         // Sort by timestamp
-        all_events.sort_by_key(|e| e.ts);
+        all_events.sort_by_key(|e| e.id);
         
         Ok(all_events)
     }

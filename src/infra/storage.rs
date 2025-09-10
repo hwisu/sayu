@@ -23,24 +23,21 @@ impl Storage {
         // Create tables
         conn.execute(
             "CREATE TABLE IF NOT EXISTS events (
-                id TEXT PRIMARY KEY,
+                id INTEGER PRIMARY KEY,
                 source TEXT NOT NULL,
                 kind TEXT NOT NULL,
                 repo TEXT NOT NULL,
                 text TEXT NOT NULL,
-                ts INTEGER NOT NULL,
                 actor TEXT,
-                file TEXT,
-                cwd TEXT,
                 meta TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                branch TEXT
             )",
             [],
         )?;
         
         // Create indices for better query performance
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_events_id ON events(id DESC)",
             [],
         )?;
         conn.execute(
@@ -55,23 +52,22 @@ impl Storage {
         Ok(Self { conn })
     }
     
+    
     pub fn save_event(&self, event: &Event) -> Result<()> {
         let meta_json = serde_json::to_string(&event.meta)?;
         
         self.conn.execute(
-            "INSERT INTO events (id, source, kind, repo, text, ts, actor, file, cwd, meta)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT OR REPLACE INTO events (id, source, kind, repo, text, actor, meta, branch)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 event.id,
                 format!("{:?}", event.source).to_lowercase(),
                 format!("{:?}", event.kind).to_lowercase(),
                 event.repo,
                 event.text,
-                event.ts,
                 event.actor.as_ref().map(|a| format!("{a:?}").to_lowercase()),
-                event.file,
-                event.cwd,
                 meta_json,
+                event.branch,
             ],
         )?;
         
@@ -80,18 +76,18 @@ impl Storage {
     
     pub fn get_recent_events(&self, repo: &str, limit: usize) -> Result<Vec<Event>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, source, kind, repo, text, ts, actor, file, cwd, meta
+            "SELECT id, source, kind, repo, text, actor, meta, branch
              FROM events
              WHERE repo = ?1
-             ORDER BY ts DESC
+             ORDER BY id DESC
              LIMIT ?2"
         )?;
         
         let events = stmt.query_map(params![repo, limit], |row| {
             let source_str: String = row.get(1)?;
             let kind_str: String = row.get(2)?;
-            let actor_str: Option<String> = row.get(6)?;
-            let meta_json: String = row.get(9)?;
+            let actor_str: Option<String> = row.get(5)?;
+            let meta_json: String = row.get(6)?;
             
             Ok(Event {
                 id: row.get(0)?,
@@ -101,13 +97,11 @@ impl Storage {
                     .unwrap_or(crate::domain::EventKind::Commit),
                 repo: row.get(3)?,
                 text: row.get(4)?,
-                ts: row.get(5)?,
                 actor: actor_str.and_then(|s| 
                     serde_json::from_value(serde_json::Value::String(s)).ok()
                 ),
-                file: row.get(7)?,
-                cwd: row.get(8)?,
                 meta: serde_json::from_str(&meta_json).unwrap_or_default(),
+                branch: row.get(7)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -117,17 +111,17 @@ impl Storage {
     
     pub fn get_events_since(&self, repo: &str, since_ts: i64) -> Result<Vec<Event>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, source, kind, repo, text, ts, actor, file, cwd, meta
+            "SELECT id, source, kind, repo, text, actor, meta, branch
              FROM events
-             WHERE repo = ?1 AND ts > ?2
-             ORDER BY ts ASC"
+             WHERE repo = ?1 AND id > ?2
+             ORDER BY id ASC"
         )?;
         
         let events = stmt.query_map(params![repo, since_ts], |row| {
             let source_str: String = row.get(1)?;
             let kind_str: String = row.get(2)?;
-            let actor_str: Option<String> = row.get(6)?;
-            let meta_json: String = row.get(9)?;
+            let actor_str: Option<String> = row.get(5)?;
+            let meta_json: String = row.get(6)?;
             
             Ok(Event {
                 id: row.get(0)?,
@@ -137,13 +131,11 @@ impl Storage {
                     .unwrap_or(crate::domain::EventKind::Commit),
                 repo: row.get(3)?,
                 text: row.get(4)?,
-                ts: row.get(5)?,
                 actor: actor_str.and_then(|s| 
                     serde_json::from_value(serde_json::Value::String(s)).ok()
                 ),
-                file: row.get(7)?,
-                cwd: row.get(8)?,
                 meta: serde_json::from_str(&meta_json).unwrap_or_default(),
+                branch: row.get(7)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -155,7 +147,7 @@ impl Storage {
         let cutoff = Utc::now().timestamp_millis() - (days * 24 * 60 * 60 * 1000);
         
         let deleted = self.conn.execute(
-            "DELETE FROM events WHERE ts < ?1",
+            "DELETE FROM events WHERE id < ?1",
             params![cutoff],
         )?;
         
@@ -164,15 +156,15 @@ impl Storage {
     
     pub fn get_all_recent_events(&self, limit: usize, source_filter: Option<&str>) -> Result<Vec<Event>> {
         let query = if let Some(source) = source_filter {
-            "SELECT id, source, kind, repo, text, ts, actor, file, cwd, meta
+            "SELECT id, source, kind, repo, text, actor, meta, branch
              FROM events
              WHERE source = ?1
-             ORDER BY ts DESC
+             ORDER BY id DESC
              LIMIT ?2"
         } else {
-            "SELECT id, source, kind, repo, text, ts, actor, file, cwd, meta
+            "SELECT id, source, kind, repo, text, actor, meta, branch
              FROM events
-             ORDER BY ts DESC
+             ORDER BY id DESC
              LIMIT ?1"
         };
         
@@ -191,8 +183,8 @@ impl Storage {
     fn row_to_event(row: &rusqlite::Row) -> rusqlite::Result<Event> {
         let source_str: String = row.get(1)?;
         let kind_str: String = row.get(2)?;
-        let actor_str: Option<String> = row.get(6)?;
-        let meta_json: String = row.get(9)?;
+        let actor_str: Option<String> = row.get(5)?;
+        let meta_json: String = row.get(6)?;
         
         Ok(Event {
             id: row.get(0)?,
@@ -202,13 +194,11 @@ impl Storage {
                 .unwrap_or(crate::domain::EventKind::Commit),
             repo: row.get(3)?,
             text: row.get(4)?,
-            ts: row.get(5)?,
             actor: actor_str.and_then(|s| 
                 serde_json::from_value(serde_json::Value::String(s)).ok()
             ),
-            file: row.get(7)?,
-            cwd: row.get(8)?,
             meta: serde_json::from_str(&meta_json).unwrap_or_default(),
+            branch: row.get(7)?,
         })
     }
 }

@@ -195,11 +195,11 @@ impl Collector for CliCollector {
                 entry.command.clone(),
             );
             
-            event.ts = entry.timestamp;
+            event = event.with_timestamp(entry.timestamp);
             
-            // Add current working directory
+            // Add current working directory to metadata
             if let Some(cwd) = entry.cwd {
-                event = event.with_cwd(cwd);
+                event = event.with_meta("cwd".to_string(), serde_json::Value::String(cwd));
             }
             
             // Add metadata
