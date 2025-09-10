@@ -102,19 +102,31 @@ class LLMSummaryGenerator:
         # Handle intent
         if parsed.get('intent'):
             lines.append(outputs['trailer_labels']['intent'])
-            lines.append(LLMSummaryGenerator._wrap_text(parsed['intent'], 2))
+            intent_value = parsed['intent']
+            # Convert to string if it's not
+            if isinstance(intent_value, list):
+                intent_value = ' '.join(str(item) for item in intent_value)
+            lines.append(LLMSummaryGenerator._wrap_text(str(intent_value), 2))
             lines.append('')
         
         # Handle what_changed
         if parsed.get('what_changed'):
             lines.append(outputs['trailer_labels']['what_changed'])
-            lines.append(LLMSummaryGenerator._wrap_text(parsed['what_changed'], 2))
+            what_changed_value = parsed['what_changed']
+            # Convert to string if it's not
+            if isinstance(what_changed_value, list):
+                what_changed_value = ' '.join(str(item) for item in what_changed_value)
+            lines.append(LLMSummaryGenerator._wrap_text(str(what_changed_value), 2))
             lines.append('')
         
         # Handle conversation_flow
         if parsed.get('conversation_flow'):
             lines.append(outputs['trailer_labels']['conversation_flow'])
-            lines.append(LLMSummaryGenerator._wrap_text(parsed['conversation_flow'], 2))
+            conversation_flow_value = parsed['conversation_flow']
+            # Convert to string if it's not
+            if isinstance(conversation_flow_value, list):
+                conversation_flow_value = ' '.join(str(item) for item in conversation_flow_value)
+            lines.append(LLMSummaryGenerator._wrap_text(str(conversation_flow_value), 2))
             lines.append('')
         
         lines.append('---')
@@ -126,6 +138,15 @@ class LLMSummaryGenerator:
         """Wrap text to specified line length with indentation, preserving original line breaks"""
         max_line_length = MAX_LINE_LENGTH
         indent_str = ' ' * indent
+        
+        # Ensure text is a string
+        if not isinstance(text, str):
+            if isinstance(text, list):
+                # If it's a list, join elements
+                text = ' '.join(str(item) for item in text)
+                print(f"⚠️ Warning: _wrap_text received list instead of string, converted to: {text[:50]}...")
+            else:
+                text = str(text)
         
         # Split by original line breaks first to preserve LLM's intentional formatting
         original_lines = text.split('\n')

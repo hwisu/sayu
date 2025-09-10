@@ -44,8 +44,8 @@ DEFAULT_SECURITY_MASKS: Final[List[str]] = [
 ]
 
 # Summary formatting constants
-SUMMARY_SEPARATOR: Final[str] = '---\n思惟\n\n'
-SUMMARY_FOOTER: Final[str] = '\n---'
+SUMMARY_SEPARATOR: Final[str] = '---思惟---\n\n'
+SUMMARY_FOOTER: Final[str] = '\n---FIN---'
 
 
 class CollectorMode(Enum):

@@ -11,8 +11,7 @@ from domain.git.hooks import GitHookManager
 from domain.events.types import Event
 from .git import GitCollector
 from .cli import CliCollector
-from .cursor import CursorCollector
-from .claude import ClaudeCollector
+from .conversation import ClaudeConversationCollector, CursorConversationCollector
 
 
 class CollectorManager:
@@ -34,8 +33,8 @@ class CollectorManager:
         # Initialize collectors
         self.git_collector = GitCollector(self.repo_root)
         self.cli_collector = CliCollector(self.repo_root)
-        self.cursor_collector = CursorCollector(self.repo_root)
-        self.claude_collector = ClaudeCollector(self.repo_root)
+        self.cursor_collector = CursorConversationCollector(self.repo_root)
+        self.claude_collector = ClaudeConversationCollector(self.repo_root)
         
     
     def collect_current_commit(self) -> List[Event]:
@@ -53,17 +52,13 @@ class CollectorManager:
             
             # Create event for overall diff stats
             diff_event = Event(
-                id=str(uuid.uuid4()),
                 ts=int(time.time() * 1000),
                 source=EventSource.GIT,
-                kind=EventKind.COMMIT,
+                kind=EventKind.DIFF,
                 repo=self.repo_root,
-                cwd=self.repo_root,
-                file=None,
-                range=None,
-                actor=Actor.USER,
                 text=git_context['diff'][:1000],  # Only first 1000 characters
-                url=None,
+                cwd=self.repo_root,
+                actor=Actor.USER,
                 meta={
                     'type': 'diff_summary',
                     'full_length': len(git_context['diff']),
@@ -77,17 +72,14 @@ class CollectorManager:
             # Store individual file diffs
             for file_path, file_diff in git_context.get('file_diffs', {}).items():
                 file_event = Event(
-                    id=str(uuid.uuid4()),
                     ts=int(time.time() * 1000),
                     source=EventSource.GIT,
-                    kind=EventKind.COMMIT,
+                    kind=EventKind.DIFF,
                     repo=self.repo_root,
+                    text=file_diff,
                     cwd=self.repo_root,
                     file=file_path,
-                    range=None,
                     actor=Actor.USER,
-                    text=file_diff,
-                    url=None,
                     meta={
                         'type': 'file_diff',
                         'file': file_path
@@ -112,16 +104,16 @@ class CollectorManager:
             if os.getenv('SAYU_DEBUG'):
                 print(f"Using cached last commit time: {cached_time}")
         else:
-            # Always use last commit time first, then fallback to 24 hours  
-            last_commit_time = self.store.get_last_commit_time(self.repo_root)
-            if last_commit_time:
-                start_time = last_commit_time
+            # Get last commit time directly from git
+            last_commit = self.git_collector.get_last_commit()
+            if last_commit and 'timestamp' in last_commit:
+                start_time = last_commit['timestamp']
                 # Cache the result
-                self.cache.set_last_commit_time(self.repo_root, last_commit_time)
+                self.cache.set_last_commit_time(self.repo_root, start_time)
                 if os.getenv('SAYU_DEBUG'):
                     from datetime import datetime
-                    dt = datetime.fromtimestamp(last_commit_time / 1000)
-                    print(f"Using last commit time: {dt.strftime('%m-%d %H:%M:%S')}")
+                    dt = datetime.fromtimestamp(start_time / 1000)
+                    print(f"Using last commit time from git: {dt.strftime('%m-%d %H:%M:%S')}")
             else:
                 # Fallback to 24 hours if no commits found
                 start_time = now_ms - (24 * 60 * 60 * 1000)

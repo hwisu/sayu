@@ -22,7 +22,7 @@ class OpenRouterClient:
             )
         
         self.base_url = "https://openrouter.ai/api/v1"
-        self.site_url = os.getenv('SAYU_OPENROUTER_SITE_URL', 'https://github.com/sayu')
+        self.site_url = os.getenv('SAYU_OPENROUTER_SITE_URL', 'https://github.com/hwisu/sayu')
         self.app_name = os.getenv('SAYU_OPENROUTER_APP_NAME', 'Sayu')
     
     def generate_summary(
@@ -74,6 +74,22 @@ class OpenRouterClient:
                 # Extract content from response
                 if 'choices' in data and len(data['choices']) > 0:
                     content = data['choices'][0]['message']['content']
+                    
+                    # Debug logging
+                    if os.getenv('SAYU_DEBUG'):
+                        print(f"[DEBUG] OpenRouter response type: {type(content)}")
+                        print(f"[DEBUG] OpenRouter response content: {content}")
+                    
+                    # Handle case where content might be a list
+                    if isinstance(content, list):
+                        # Join list elements if it's a list
+                        content = ' '.join(str(item) for item in content)
+                        print(f"⚠️ Warning: OpenRouter returned list instead of string, converted to: {content[:100]}...")
+                    
+                    # Ensure content is a string
+                    if not isinstance(content, str):
+                        content = str(content)
+                    
                     return content.strip()
                 
                 return None

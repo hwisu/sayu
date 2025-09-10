@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-from domain.events.types import Event, EventSource, EventKind, Actor, Config, Connector
+from domain.events.types import Event, EventSource, EventKind, Actor
 from infra.shell.executor import ShellExecutor
 
 
@@ -32,7 +32,7 @@ class GitCollector:
         except Exception:
             return False
     
-    def pull_since(self, since_ms: int, until_ms: int, cfg: Config) -> List[Event]:
+    def pull_since(self, since_ms: int, until_ms: int, cfg: Any) -> List[Event]:
         """Pull git events within time range"""
         events = []
         
@@ -74,17 +74,13 @@ class GitCollector:
                             commits.append(commit_info)
                             
                             event = Event(
-                                id=str(uuid.uuid4()),
                                 ts=timestamp,
                                 source=EventSource.GIT,
                                 kind=EventKind.COMMIT,
                                 repo=self.repo_root,
-                                cwd=self.repo_root,
-                                file=None,
-                                range=None,
-                                actor=Actor.USER,
                                 text=message,
-                                url=None,
+                                cwd=self.repo_root,
+                                actor=Actor.USER,
                                 meta={
                                     'hash': commit_hash,
                                     'author': author,
@@ -143,7 +139,7 @@ class GitCollector:
         except Exception as e:
             return {'ok': False, 'reason': str(e)}
     
-    def redact(self, event: Event, cfg: Config) -> Event:
+    def redact(self, event: Event, cfg: Any) -> Event:
         """Redact sensitive information from git event"""
         if not cfg.privacy.maskSecrets:
             return event

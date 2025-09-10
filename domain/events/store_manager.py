@@ -1,27 +1,29 @@
-"""Store manager singleton for event database"""
+"""Store manager for event storage"""
 
-from .store import EventStore
+from .memory_store import InMemoryEventStore
 
 
 class StoreManager:
-    """Singleton manager for event store"""
+    """Manages singleton event store instance"""
     
     _instance = None
     
     @classmethod
-    def get_store(cls) -> EventStore:
-        """Get or create event store instance"""
+    def get_store(cls) -> InMemoryEventStore:
+        """Get or create store instance"""
         if cls._instance is None:
-            cls._instance = EventStore()
+            cls._instance = InMemoryEventStore()
         return cls._instance
     
     @classmethod
+    def clear(cls):
+        """Clear the store (useful for testing)"""
+        if cls._instance:
+            cls._instance.clear()
+    
+    @classmethod
     def check_connection(cls):
-        """Check database connection"""
-        store = cls.get_store()
-        # Test connection by attempting a query
-        try:
-            store.find_by_time_range(0, 1)
-            return True
-        except Exception as e:
-            raise ConnectionError(f"Database connection failed: {e}")
+        """Check store connectivity (compatibility method)"""
+        # In-memory store is always available
+        cls.get_store()
+        return True

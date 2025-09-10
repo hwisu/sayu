@@ -1,1 +1,0 @@
-"""Sayu daemon module"""

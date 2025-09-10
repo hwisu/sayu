@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import uuid
 
-from domain.events.types import Event, EventSource, EventKind, Actor, Config, Connector
+from domain.events.types import Event, EventSource, EventKind, Actor
 
 
 class CliCollector:
@@ -29,7 +29,7 @@ class CliCollector:
         hook_path = self._get_hook_path()
         return hook_path.exists()
     
-    def pull_since(self, since_ms: int, until_ms: int, cfg: Config) -> List[Event]:
+    def pull_since(self, since_ms: int, until_ms: int, cfg: Any) -> List[Event]:
         """Pull CLI events within time range"""
         events = []
         
@@ -85,7 +85,7 @@ class CliCollector:
         except Exception:
             return {'ok': False, 'reason': 'unable to check CLI logs'}
     
-    def redact(self, event: Event, cfg: Config) -> Event:
+    def redact(self, event: Event, cfg: Any) -> Event:
         """Redact sensitive information from CLI event"""
         # For CLI events, we primarily redact the text field
         text = event.text
