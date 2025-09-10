@@ -141,10 +141,32 @@ class ConversationCollector(ABC):
             meta=message.get('meta', {})
         )
     
-    def _is_tool_related_content(self, text: str) -> bool:
+    def _is_tool_related_content(self, text) -> bool:
         """Check if text content is related to tool usage"""
         if not text:
             return False
+        
+        # Handle list content (from Claude's structured format)
+        if isinstance(text, list):
+            # Check each item in the list
+            for item in text:
+                if isinstance(item, dict):
+                    # Skip tool-related items
+                    if item.get('type') in ['tool_use', 'tool_result', 'function_call']:
+                        return True
+                    # Check text content in the item
+                    if item.get('type') == 'text':
+                        item_text = item.get('text', '')
+                        if self._is_tool_related_content(item_text):
+                            return True
+                elif isinstance(item, str):
+                    if self._is_tool_related_content(item):
+                        return True
+            return False
+        
+        # Ensure text is a string for the rest of the checks
+        if not isinstance(text, str):
+            text = str(text)
         
         # Tool-related patterns
         tool_patterns = [
