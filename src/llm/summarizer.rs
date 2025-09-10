@@ -194,6 +194,7 @@ impl EventSummarizer {
 {}
 
 위 정보를 바탕으로 이 커밋의 배경과 의도를 분석하여 JSON 형식으로 응답해주세요.
+반드시 한글로 작성해주세요.
 다음 JSON 구조를 정확히 따라주세요:
 
 {{
@@ -261,7 +262,7 @@ Respond only with valid JSON, without any additional explanation or markdown for
             .collect();
         
         // Format as Git trailer with continuation lines
-        let mut result = String::from("Sayu-Context: ");
+        let mut result = String::from("\nSayu-Context: \n\n");
         
         for (i, line) in lines.iter().enumerate() {
             if i == 0 {
