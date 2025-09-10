@@ -29,11 +29,11 @@ def main_analysis(conversations: str, staged_files: List[str], diff_stats: str, 
 다음 세 가지 핵심 측면으로 JSON을 반환하세요:
 
 {{
-  "what_changed": "이 커밋에서 만들어진 모든 변경 사항의 포괄적인 목록. 구체적인 파일, 함수, 로직 수정 사항과 위치를 포함하세요. 상세하고 정확하게.",
+  "what_changed": "이 커밋에서 수정된 내용을 명확한 한글 문장으로 설명하세요. 구체적인 파일명과 변경 사항을 자연스러운 문장으로 작성하세요.",
   
-  "conversation_flow": "대화에서 나타난 개발 여정. 논의가 어떻게 진행되었나? 어떤 접근법을 시도했나? 어떤 도전이 있었고 어떻게 해결했나? 주요 결정 지점 포함.",
+  "conversation_flow": "대화의 흐름을 시간순으로 한글 문장으로 설명하세요. '~를 논의했다', '~를 시도했다', '~문제를 발견했다' 등의 형태로 작성하세요.",
   
-  "intent": "이러한 변경의 목적. 대화에서 명시적으로 언급되었다면 인용하고, 그렇지 않다면 맥락에서 추론. 왜 이 작업이 필요했나? 어떤 문제를 해결하나?"
+  "intent": "이 변경의 목적을 간결한 한글 문장으로 설명하세요. 왜 이 작업을 했는지 명확하게 표현하세요."
 }}
 
 JSON response:"""
@@ -57,9 +57,9 @@ def simplified_analysis(conversations: str, staged_files: List[str], diff_stats:
 간단한 JSON 요약 반환:
 
 {{
-  "what_changed": "주요 수정 사항 (파일, 함수, 로직)",
-  "conversation_flow": "개발 논의가 어떻게 진행되었는지",
-  "intent": "변경의 목적 (명시적이거나 추론된)"
+  "what_changed": "주요 수정 사항을 한글 문장으로 설명",
+  "conversation_flow": "개발 과정을 한글 문장으로 설명",
+  "intent": "변경 목적을 한글 문장으로 설명"
 }}
 
 JSON response:"""

@@ -237,30 +237,5 @@ add-zsh-hook precmd sayu_precmd
     
     def _categorize_command(self, cmd: str) -> EventKind:
         """Categorize command type"""
-        command = cmd.strip().split(' ')[0].lower()
-        
-        # Test related
-        test_patterns = ['npm test', 'yarn test', 'jest', 'pytest', 'go test', 'cargo test']
-        if any(test in cmd for test in test_patterns):
-            return EventKind.TEST
-        
-        # Build related
-        build_patterns = ['npm run build', 'yarn build', 'make', 'cargo build', 'go build']
-        if any(build in cmd for build in build_patterns):
-            return EventKind.RUN
-        
-        # Git related
-        if command == 'git':
-            return EventKind.RUN
-        
-        # Benchmark/performance
-        bench_patterns = ['benchmark', 'bench', 'perf']
-        if any(bench in cmd for bench in bench_patterns):
-            return EventKind.BENCH
-        
-        # Error cases
-        if 'error' in cmd or 'failed' in cmd:
-            return EventKind.ERROR
-        
-        # Default
-        return EventKind.RUN
+        # All CLI commands are now categorized as COMMAND
+        return EventKind.COMMAND

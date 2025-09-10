@@ -12,6 +12,7 @@ from shared.constants import (
     MAX_CONVERSATION_COUNT, MAX_CONVERSATION_LENGTH,
     MAX_SIMPLIFIED_CONVERSATIONS, MAX_SIMPLIFIED_LENGTH,
     MAX_RAW_RESPONSE_LENGTH, MAX_LINE_LENGTH,
+    SUMMARY_SEPARATOR, SUMMARY_FOOTER
 )
 
 
@@ -103,9 +104,7 @@ class LLMSummaryGenerator:
         i18n_manager = i18n()
         outputs = i18n_manager.get_outputs()
         
-        lines.append('---')
-        lines.append(outputs['trailer_header'])
-        lines.append('')
+        lines.append(SUMMARY_SEPARATOR.rstrip())
         
         # Handle intent
         if parsed.get('intent'):
@@ -137,7 +136,7 @@ class LLMSummaryGenerator:
             lines.append(LLMSummaryGenerator._wrap_text(str(conversation_flow_value), 2))
             lines.append('')
         
-        lines.append('---')
+        lines.append(SUMMARY_FOOTER.strip())
         
         return '\n'.join(lines)
     
@@ -190,7 +189,7 @@ class LLMSummaryGenerator:
     def _format_raw_response(text: str) -> str:
         """Format raw response as fallback"""
         lines = []
-        lines.append('---思惟---')
+        lines.append(SUMMARY_SEPARATOR.rstrip())
         
         # Ensure text is a string
         if not isinstance(text, str):
@@ -202,7 +201,7 @@ class LLMSummaryGenerator:
         else:
             lines.append(f"Summary: {clean_text}")
         
-        lines.append('---FIN---')
+        lines.append(SUMMARY_FOOTER.strip())
         
         return '\n'.join(lines)
     
