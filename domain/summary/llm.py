@@ -161,8 +161,7 @@ class LLMSummaryGenerator:
     def _format_raw_response(text: str) -> str:
         """Format raw response as fallback"""
         lines = []
-        lines.append('---')
-        lines.append('思惟---')
+        lines.append('---思惟---')
         
         # Ensure text is a string
         if not isinstance(text, str):
