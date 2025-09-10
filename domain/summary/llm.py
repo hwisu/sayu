@@ -4,6 +4,7 @@ import json
 import re
 from typing import List, Dict, Any
 
+import os
 from domain.events.types import Event
 from infra.api.llm_factory import LLMFactory
 from i18n import i18n
@@ -20,12 +21,19 @@ class LLMSummaryGenerator:
     @staticmethod
     def generate(llm_events: List[Event], staged_files: List[str], diff_stats: str) -> str:
         """Generate main LLM summary"""
-        prompt = LLMSummaryGenerator._build_prompt(llm_events, staged_files, diff_stats)
-        response = LLMFactory.call_llm(prompt)
-        
-        # Handle None or invalid response
-        if response is None:
-            return LLMSummaryGenerator._format_raw_response("No response from LLM")
+        try:
+            prompt = LLMSummaryGenerator._build_prompt(llm_events, staged_files, diff_stats)
+            response = LLMFactory.call_llm(prompt)
+            
+            # Handle None or invalid response
+            if response is None:
+                return LLMSummaryGenerator._format_raw_response("No response from LLM")
+        except Exception as e:
+            import traceback
+            print(f"[Sayu] LLM Error: {type(e).__name__}: {e}")
+            if os.getenv('SAYU_DEBUG'):
+                traceback.print_exc()
+            return LLMSummaryGenerator._format_raw_response(f"LLM Error: {e}")
         
         # Ensure response is a string
         if not isinstance(response, str):

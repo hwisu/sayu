@@ -79,6 +79,8 @@ class LLMFactory:
                 raise ValueError(f"Unsupported LLM provider: {provider}")
                 
         except Exception as e:
+            print(f"[Sayu] LLM call failed: {type(e).__name__}: {e}")
             if os.getenv('SAYU_DEBUG'):
-                print(f"LLM call failed: {e}")
+                import traceback
+                traceback.print_exc()
             return None
