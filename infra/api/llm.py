@@ -70,6 +70,11 @@ class LLMApiClient:
         if not api_key:
             raise ValueError('SAYU_GEMINI_API_KEY not found in environment')
         
+        # Log prompt size
+        print(f"[Sayu] Sending prompt to LLM (length: {len(prompt)} chars)")
+        if os.getenv('SAYU_DEBUG'):
+            print(f"[DEBUG] First 500 chars of prompt: {prompt[:500]}...")
+        
         # Use faster model if available
         model = os.getenv('SAYU_GEMINI_MODEL', 'gemini-2.5-flash')
         url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
@@ -95,7 +100,7 @@ class LLMApiClient:
             'Content-Type': 'application/json'
         }
         
-        with httpx.Client(timeout=10.0) as client:
+        with httpx.Client(timeout=30.0) as client:  # Increased timeout for LLM responses
             response = client.post(url, headers=headers, json=payload)
             response.raise_for_status()
             
