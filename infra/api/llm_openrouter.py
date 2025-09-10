@@ -97,7 +97,7 @@ class OpenRouterClient:
             elif e.response.status_code == 400:
                 print("Error: Bad request - check model name and parameters")
             elif e.response.status_code == 404:
-                print(f"Error: Model not found - '{model_id}'")
+                print(f"Error: Model not found - '{model}'")
             
             return None
             
