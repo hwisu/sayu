@@ -59,8 +59,8 @@ def init(no_interactive):
         available_apis = LLMApiClient.get_available_apis()
         if not available_apis['gemini']:
             print("\n⚠️  No LLM API keys configured")
-            print("\nAdd this to your .env file:")
-            print("  GEMINI_API_KEY=your-key")
+            print("\nSet this system environment variable:")
+            print("  export SAYU_GEMINI_API_KEY=your-key")
         else:
             print("\n🎉 All set! AI context will be automatically added to your commits.")
             

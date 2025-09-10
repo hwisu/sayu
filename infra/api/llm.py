@@ -30,8 +30,8 @@ class LLMApiClient:
                 return cached_response
         
         # Make API call
-        if not os.getenv('GEMINI_API_KEY'):
-            raise ValueError('GEMINI_API_KEY not found')
+        if not os.getenv('SAYU_GEMINI_API_KEY'):
+            raise ValueError('SAYU_GEMINI_API_KEY not found')
         
         response = cls._call_gemini(prompt)
         
@@ -67,9 +67,9 @@ class LLMApiClient:
     @classmethod
     def _call_gemini(cls, prompt: str) -> str:
         """Call Gemini API using httpx"""
-        api_key = os.getenv('GEMINI_API_KEY')
+        api_key = os.getenv('SAYU_GEMINI_API_KEY')
         if not api_key:
-            raise ValueError('GEMINI_API_KEY not found in environment')
+            raise ValueError('SAYU_GEMINI_API_KEY not found in environment')
         
         url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
         
@@ -110,5 +110,5 @@ class LLMApiClient:
     def get_available_apis(cls) -> Dict[str, bool]:
         """Get available API keys"""
         return {
-            'gemini': bool(os.getenv('GEMINI_API_KEY'))
+            'gemini': bool(os.getenv('SAYU_GEMINI_API_KEY'))
         }

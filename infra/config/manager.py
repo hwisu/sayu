@@ -46,7 +46,7 @@ class ConfigManager:
             commitTrailer=self.user_config.commitTrailer
         )
         
-        # Environment variable overrides
+        # System environment variable overrides (always take precedence)
         if os.getenv('SAYU_ENABLED') == 'false':
             config.enabled = False
         if os.getenv('SAYU_LANG') in ['en', 'ko']:

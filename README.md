@@ -42,13 +42,13 @@ This will:
 - Create local database (`~/.sayu/events.db`)
 - Generate config file (`.sayu.yml`)
 
-### 2. Set API Key (.env)
+### 2. Set API Key (System Environment)
 
-Add your API key:
+Set your API key as a system environment variable:
 
 ```bash
 # Gemini API key (required)
-GEMINI_API_KEY=your_api_key_here
+export SAYU_GEMINI_API_KEY=your_api_key_here
 ```
 
 ### 3. Commit as usual
@@ -120,12 +120,14 @@ output:
 
 ```bash
 # Language and feature toggles
-SAYU_ENABLED=false      # Disable Sayu
-SAYU_LANG=en           # Language (ko | en)
-SAYU_TRAILER=false     # Disable commit trailer
+export SAYU_ENABLED=false              # Disable Sayu
+export SAYU_LANG=en                   # Language (ko | en)
+export SAYU_TRAILER=false             # Disable commit trailer
 
-# API Keys (in .env file)
-GEMINI_API_KEY=your-key-here
+# API Keys (system environment variables)
+export SAYU_GEMINI_API_KEY=your-key-here
+export SAYU_OPENROUTER_API_KEY=your-key-here    # Optional: for OpenRouter
+export SAYU_LLM_PROVIDER=gemini              # LLM provider (gemini | openrouter)
 ```
 
 ## FAQ

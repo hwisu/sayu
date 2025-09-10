@@ -47,7 +47,7 @@ API 키를 설정하세요:
 
 ```bash
 # Gemini API 키 (필수)
-GEMINI_API_KEY=your_api_key_here
+export SAYU_GEMINI_API_KEY=your_api_key_here
 ```
 
 ### 3. 평소처럼 커밋하기
@@ -124,7 +124,7 @@ SAYU_LANG=ko           # 언어 설정 (ko | en)
 SAYU_TRAILER=false     # 커밋 트레일러 비활성화
 
 # API 키 (.env 파일)
-GEMINI_API_KEY=your-key-here
+export SAYU_GEMINI_API_KEY=your-key-here
 ```
 
 ## FAQ

@@ -14,16 +14,16 @@ class OpenRouterClient:
     
     def __init__(self, api_key: Optional[str] = None):
         """Initialize OpenRouter client"""
-        self.api_key = api_key or os.getenv('OPENROUTER_API_KEY')
+        self.api_key = api_key or os.getenv('SAYU_OPENROUTER_API_KEY')
         if not self.api_key:
             raise ValueError(
                 "OpenRouter API key not found. "
-                "Set OPENROUTER_API_KEY environment variable or pass api_key parameter"
+                "Set SAYU_OPENROUTER_API_KEY environment variable or pass api_key parameter"
             )
         
         self.base_url = "https://openrouter.ai/api/v1"
-        self.site_url = os.getenv('OPENROUTER_SITE_URL', 'https://github.com/sayu')
-        self.app_name = os.getenv('OPENROUTER_APP_NAME', 'Sayu')
+        self.site_url = os.getenv('SAYU_OPENROUTER_SITE_URL', 'https://github.com/sayu')
+        self.app_name = os.getenv('SAYU_OPENROUTER_APP_NAME', 'Sayu')
     
     def generate_summary(
         self,
@@ -36,7 +36,7 @@ class OpenRouterClient:
         
         # Use model from parameter, env, or fallback to claude-3-haiku
         if not model:
-            model = os.getenv('OPENROUTER_MODEL', 'anthropic/claude-3-haiku')
+            model = os.getenv('SAYU_OPENROUTER_MODEL', 'anthropic/claude-3-haiku')
         
         url = f"{self.base_url}/chat/completions"
         
