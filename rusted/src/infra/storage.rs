@@ -1,0 +1,215 @@
+use anyhow::Result;
+use chrono::{DateTime, Utc};
+use rusqlite::{params, Connection, OptionalExtension};
+use serde_json;
+use std::path::{Path, PathBuf};
+use crate::domain::Event;
+
+pub struct Storage {
+    conn: Connection,
+}
+
+impl Storage {
+    pub fn new(repo_root: impl AsRef<Path>) -> Result<Self> {
+        let db_path = repo_root.as_ref().join(".sayu").join("events.db");
+        
+        // Ensure directory exists
+        if let Some(parent) = db_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        
+        let conn = Connection::open(&db_path)?;
+        
+        // Create tables
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS events (
+                id TEXT PRIMARY KEY,
+                source TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                repo TEXT NOT NULL,
+                text TEXT NOT NULL,
+                ts INTEGER NOT NULL,
+                actor TEXT,
+                file TEXT,
+                cwd TEXT,
+                meta TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )",
+            [],
+        )?;
+        
+        // Create indices for better query performance
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts DESC)",
+            [],
+        )?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_events_repo ON events(repo)",
+            [],
+        )?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_events_source ON events(source)",
+            [],
+        )?;
+        
+        Ok(Self { conn })
+    }
+    
+    pub fn save_event(&self, event: &Event) -> Result<()> {
+        let meta_json = serde_json::to_string(&event.meta)?;
+        
+        self.conn.execute(
+            "INSERT INTO events (id, source, kind, repo, text, ts, actor, file, cwd, meta)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                event.id,
+                format!("{:?}", event.source).to_lowercase(),
+                format!("{:?}", event.kind).to_lowercase(),
+                event.repo,
+                event.text,
+                event.ts,
+                event.actor.as_ref().map(|a| format!("{:?}", a).to_lowercase()),
+                event.file,
+                event.cwd,
+                meta_json,
+            ],
+        )?;
+        
+        Ok(())
+    }
+    
+    pub fn get_recent_events(&self, repo: &str, limit: usize) -> Result<Vec<Event>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, source, kind, repo, text, ts, actor, file, cwd, meta
+             FROM events
+             WHERE repo = ?1
+             ORDER BY ts DESC
+             LIMIT ?2"
+        )?;
+        
+        let events = stmt.query_map(params![repo, limit], |row| {
+            let source_str: String = row.get(1)?;
+            let kind_str: String = row.get(2)?;
+            let actor_str: Option<String> = row.get(6)?;
+            let meta_json: String = row.get(9)?;
+            
+            Ok(Event {
+                id: row.get(0)?,
+                source: serde_json::from_value(serde_json::Value::String(source_str))
+                    .unwrap_or(crate::domain::EventSource::Git),
+                kind: serde_json::from_value(serde_json::Value::String(kind_str))
+                    .unwrap_or(crate::domain::EventKind::Commit),
+                repo: row.get(3)?,
+                text: row.get(4)?,
+                ts: row.get(5)?,
+                actor: actor_str.and_then(|s| 
+                    serde_json::from_value(serde_json::Value::String(s)).ok()
+                ),
+                file: row.get(7)?,
+                cwd: row.get(8)?,
+                meta: serde_json::from_str(&meta_json).unwrap_or_default(),
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(events)
+    }
+    
+    pub fn get_events_since(&self, repo: &str, since_ts: i64) -> Result<Vec<Event>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, source, kind, repo, text, ts, actor, file, cwd, meta
+             FROM events
+             WHERE repo = ?1 AND ts > ?2
+             ORDER BY ts ASC"
+        )?;
+        
+        let events = stmt.query_map(params![repo, since_ts], |row| {
+            let source_str: String = row.get(1)?;
+            let kind_str: String = row.get(2)?;
+            let actor_str: Option<String> = row.get(6)?;
+            let meta_json: String = row.get(9)?;
+            
+            Ok(Event {
+                id: row.get(0)?,
+                source: serde_json::from_value(serde_json::Value::String(source_str))
+                    .unwrap_or(crate::domain::EventSource::Git),
+                kind: serde_json::from_value(serde_json::Value::String(kind_str))
+                    .unwrap_or(crate::domain::EventKind::Commit),
+                repo: row.get(3)?,
+                text: row.get(4)?,
+                ts: row.get(5)?,
+                actor: actor_str.and_then(|s| 
+                    serde_json::from_value(serde_json::Value::String(s)).ok()
+                ),
+                file: row.get(7)?,
+                cwd: row.get(8)?,
+                meta: serde_json::from_str(&meta_json).unwrap_or_default(),
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(events)
+    }
+    
+    pub fn cleanup_old_events(&self, days: i64) -> Result<usize> {
+        let cutoff = Utc::now().timestamp_millis() - (days * 24 * 60 * 60 * 1000);
+        
+        let deleted = self.conn.execute(
+            "DELETE FROM events WHERE ts < ?1",
+            params![cutoff],
+        )?;
+        
+        Ok(deleted)
+    }
+}
+
+// Simple cache implementation
+pub struct Cache {
+    cache_dir: PathBuf,
+}
+
+impl Cache {
+    pub fn new(repo_root: impl AsRef<Path>) -> Result<Self> {
+        let cache_dir = repo_root.as_ref().join(".sayu").join("cache");
+        std::fs::create_dir_all(&cache_dir)?;
+        
+        Ok(Self { cache_dir })
+    }
+    
+    pub fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
+        let file_path = self.cache_dir.join(format!("{}.cache", key));
+        
+        if !file_path.exists() {
+            return Ok(None);
+        }
+        
+        // Check if cache is expired (simple TTL: 5 minutes)
+        if let Ok(metadata) = file_path.metadata() {
+            if let Ok(modified) = metadata.modified() {
+                if modified.elapsed().unwrap_or_default().as_secs() > 300 {
+                    let _ = std::fs::remove_file(&file_path);
+                    return Ok(None);
+                }
+            }
+        }
+        
+        Ok(Some(std::fs::read(&file_path)?))
+    }
+    
+    pub fn set(&self, key: &str, value: &[u8]) -> Result<()> {
+        let file_path = self.cache_dir.join(format!("{}.cache", key));
+        std::fs::write(&file_path, value)?;
+        Ok(())
+    }
+    
+    pub fn clear(&self) -> Result<()> {
+        for entry in std::fs::read_dir(&self.cache_dir)? {
+            if let Ok(entry) = entry {
+                if entry.path().extension().and_then(|s| s.to_str()) == Some("cache") {
+                    let _ = std::fs::remove_file(entry.path());
+                }
+            }
+        }
+        Ok(())
+    }
+}
