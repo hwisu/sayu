@@ -1,175 +1,107 @@
-# Sayu - AI Coding Context for Git Commits
+# Sayu
 
-> Automatically capture the "why" behind your code changes from AI conversations
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 
-[한국어](README.ko-kr.md)
+Automatically capture context from AI conversations and add it to your git commits.
 
-## What is Sayu?
-
-Sayu analyzes your conversations with AI coding assistants (Cursor, Claude) and automatically adds meaningful context to your git commits.
-
-## Key Features
-
-- **AI conversation collection**: Automatically collects conversations from Cursor and Claude Desktop
-- **Smart filtering**: Focuses only on relevant conversations from your repository
-- **Fast processing**: Generates context in 2-3 seconds during commit
-- **Privacy-first**: All data processed locally, no persistent storage
-- **Fail-safe**: Never blocks commits even if something goes wrong
-
-## Installation
+## Quick Start
 
 ```bash
-# Install with pipx (recommended)
-pipx install sayu
+# Build from source
+cargo build --release
 
-# Or with pip
-pip install sayu
+# Install globally
+cargo install --path .
 
-# Initialize in your repository
+# Initialize in your repo
 sayu init
+
+# Set API key (choose one)
+export SAYU_GEMINI_API_KEY=your_key
+
+# Or use OpenRouter (recommended for better model access)
+export SAYU_OPENROUTER_API_KEY=your_key
+export SAYU_LLM_MODEL=anthropic/claude-3.5-haiku  # Optional: specify model
+
+# Commit normally
+git commit -m "Fix bug"
 ```
 
-## Usage
+Your commits will automatically include AI-analyzed context.
 
-### 1. Initialize
-```bash
-# Run in your Git repository
-sayu init
-```
+## Features
 
-This will:
-- Install Git hooks (commit-msg, post-commit)
-- Generate config file (`.sayu.yml`)
-
-### 2. Set API Key
-
-Set your API key as an environment variable:
-
-```bash
-# Gemini API key (recommended)
-export SAYU_GEMINI_API_KEY=your_api_key_here
-
-# Or OpenRouter API key
-export SAYU_OPENROUTER_API_KEY=your_api_key_here
-export SAYU_LLM_PROVIDER=openrouter
-```
-
-### 3. Commit as usual
-
-```bash
-git add .
-git commit -m "Fix authentication bug"
-```
-
-Result:
-```
-Fix authentication bug
-
----思惟---
-
-Intent:
-  Fix JWT token validation logic to resolve login failures
-
-What Changed:
-  Improved exception handling in auth.js token decoding
-  Added test cases for expired tokens in test/auth.test.js
-
-Conversation Flow:
-  Discussed error handling approaches with Claude for token expiration.
-  Identified need for more granular exception handling.
-  Found and fixed several edge cases during test implementation.
----FIN---
-```
+- Collects conversations from Cursor, Claude Desktop, and shell commands
+- Automatically adds AI-generated context to commits
+- Hash-based deduplication prevents duplicate events
+- Time-range aware collection (only events since last commit)
+- Processes everything locally
+- Never blocks commits on errors
+- Written in Rust for performance
 
 ## Commands
 
 ```bash
-# Check system status
-sayu health
+sayu --version       # Show version
+sayu health          # Check system status
+sayu init            # Initialize in repository
+sayu list -n 20      # List recent events
+sayu list --collect  # Collect fresh events before listing
+sayu commit <hash>   # Show context for specific commit
+sayu show -n 5       # Show recent commit context
+sayu uninstall       # Remove from repository
 
-# Preview AI context for staged changes
-sayu preview
-
-# Install/uninstall CLI tracking (zsh)
-sayu collector cli-install
-sayu collector cli-uninstall
+# Pipe to other tools for analysis
+sayu commit <hash> | gpt -c "Summarize this commit's context"
+sayu list -v | gpt -c "What was I working on?"
 ```
 
-## Configuration (.sayu.yml)
+## Configuration
 
+`.sayu.yml` (only language is configurable):
 ```yaml
-# Sayu Configuration
-# Captures the 'why' behind your code changes
-
-language: ko              # Language (ko, en)
-commitTrailer: true       # Add AI analysis to commit messages
-
-connectors:
-  claude: true            # Claude Desktop conversation collection
-  cursor: true            # Cursor editor conversation collection
-  cli:
-    mode: "zsh-preexec"   # CLI command collection (or "off")
-
-# Environment variables override:
-# SAYU_ENABLED=false
-# SAYU_LANG=en
-# SAYU_TRAILER=false
+language: ko    # or en
 ```
 
-## Environment Variables
+The following settings are now hardcoded defaults:
+- `enabled`: always true
+- `commitTrailer`: always true
+- All connectors: always enabled
 
+Environment variables:
 ```bash
-# Core settings
-export SAYU_ENABLED=false              # Disable Sayu
-export SAYU_LANG=en                    # Language (ko | en)
-export SAYU_TRAILER=false              # Disable commit trailer
+SAYU_LANG=en                    # Override language
+SAYU_DEBUG=true                 # Debug mode
 
 # LLM Configuration
-export SAYU_GEMINI_API_KEY=your-key    # Gemini API key
-export SAYU_OPENROUTER_API_KEY=your-key # OpenRouter API key
-export SAYU_LLM_PROVIDER=gemini        # LLM provider (gemini | openrouter)
-export SAYU_OPENROUTER_MODEL=anthropic/claude-3-haiku  # OpenRouter model
-
-# Debug
-export SAYU_DEBUG=true                 # Enable debug logging
+SAYU_OPENROUTER_API_KEY=key     # OpenRouter API key (recommended)
+SAYU_GEMINI_API_KEY=key         # Google Gemini API key
+SAYU_LLM_MODEL=model_name       # Model to use (default: anthropic/claude-3.5-haiku)
+SAYU_LLM_TEMPERATURE=0.7        # Creativity level (0.0-1.0)
+SAYU_LLM_MAX_TOKENS=1000        # Maximum tokens
 ```
 
-## FAQ
+Popular OpenRouter models:
+- `anthropic/claude-3.5-haiku` - Fast and cost-effective
+- `anthropic/claude-3.5-sonnet` - Balanced performance
+- `openai/gpt-4o-mini` - Fast and cheap
+- `meta-llama/llama-3.1-8b-instruct` - Open source
 
-### Q: Where is my data stored?
-A: Sayu uses in-memory storage only. Conversations are collected during commit and immediately discarded after processing. No persistent database is created.
-
-### Q: How do I add support for a new AI tool?
-A: Create a new collector by extending `ConversationCollector` in `domain/collectors/conversation.py`
-
-### Q: How do I change the summary language?
-A: Change `language` in `.sayu.yml` or set `SAYU_LANG` environment variable
-
-### Q: How do I disable Sayu temporarily?
-A: Set `SAYU_ENABLED=false` or use `--no-verify` with git commit
-
-### Q: What if the LLM API fails?
-A: Sayu is fail-safe. If LLM fails, your commit proceeds normally with a fallback message.
-
-## Privacy & Security
-
-- All processing happens locally on your machine
-- No data is sent except to your configured LLM API
-- No persistent storage or logging of conversations
-- API keys are only read from environment variables
-
-## Troubleshooting
+## Building
 
 ```bash
-# Enable debug mode for detailed logs
-export SAYU_DEBUG=true
-git commit -m "test"
+# Development build
+cargo build
 
-# Check if collectors are working
-sayu health
+# Release build (optimized)
+cargo build --release
 
-# Test LLM connection
-sayu preview
+# Run tests
+cargo test
+
+# Install locally
+cargo install --path .
 ```
 
 ## License
