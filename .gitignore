@@ -1,71 +1,63 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-*.manifest
-*.spec
-.sayu
+# Rust build artifacts
+/target/
+**/*.rs.bk
+*.pdb
 
-
-# Virtual environments
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-
-# Testing
-.tox/
-.coverage
-.pytest_cache/
-.hypothesis/
-.pytype/
-htmlcov/
-
-# Jupyter Notebook
-.ipynb_checkpoints
+# Cargo
+Cargo.lock
 
 # IDE
-.vscode/
 .idea/
+*.iml
+.vscode/
 *.swp
 *.swo
+*~
+
+# OS
 .DS_Store
-.spyderproject
-.spyproject
-.ropeproject
+Thumbs.db
 
-# Type checking
-.mypy_cache/
-.dmypy.json
-dmypy.json
+# Debug
+*.dSYM/
 
-# Environment
+# Profiling
+perf.data
+perf.data.old
+flamegraph.svg
+
+# Test coverage
+tarpaulin-report.html
+cobertura.xml
+
+# Benchmarking
+/benches/target/
+
+# Documentation
+/target/doc/
+
+# Temporary files
+*.tmp
+.temp/
+
+# Environment variables
 .env
 .env.local
 
-# Logs
-*.log
-pip-log.txt
-pip-delete-this-directory.txt
+# Backup files
+*.bak
+*.orig
 
-# Local database (user data)
-# Note: .sayu/ folder is in user home, not in project
+# Log files
+*.log
+
+# Sayu runtime data
+.sayu/
+
+# Python remnants (if any)
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+venv/
+.venv/

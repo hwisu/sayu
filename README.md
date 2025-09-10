@@ -1,12 +1,18 @@
 # Sayu
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+
 Capture the "why" behind your code changes from AI conversations.
 
 ## Quick Start
 
 ```bash
-# Install with pipx
-pipx install git+https://github.com/yourusername/sayu.git
+# Build from source
+cargo build --release
+
+# Install globally
+cargo install --path .
 
 # Initialize in your repo
 sayu init
@@ -31,29 +37,50 @@ Your commits will automatically include AI-analyzed context.
 - Adds meaningful context to git commits
 - Processes everything locally
 - Never blocks commits
+- Written in Rust for performance and reliability
 
 ## Commands
 
 ```bash
-sayu health   # Check status
-sayu preview  # Preview AI context
+sayu --version    # Show version
+sayu health       # Check status
+sayu init         # Initialize in repository
+sayu show -n 5    # Show recent events
+sayu uninstall    # Remove from repository
 ```
 
 ## Configuration
 
-`.sayu.yml`:
+`.sayu.yml` (only language is configurable):
 ```yaml
-language: en          # or ko
-commitTrailer: true
-connectors:
-  claude: true
-  cursor: true
+language: ko    # or en
 ```
+
+The following settings are now hardcoded defaults:
+- `enabled`: always true
+- `commitTrailer`: always true
+- All connectors: always enabled
 
 Environment variables:
 ```bash
-SAYU_ENABLED=false    # Disable temporarily
+SAYU_LANG=en          # Override language
 SAYU_DEBUG=true       # Debug mode
+```
+
+## Building
+
+```bash
+# Development build
+cargo build
+
+# Release build (optimized)
+cargo build --release
+
+# Run tests
+cargo test
+
+# Install locally
+cargo install --path .
 ```
 
 ## License
