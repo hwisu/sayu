@@ -9,63 +9,71 @@ def main_analysis(conversations: str, staged_files: List[str], diff_stats: str, 
     if len(staged_files) > 10:
         files_str += f" (+{len(staged_files)-10} more)"
     
-    return f"""Analyze this commit to provide effective context for future development.
+    return f"""Analyze this commit's context to provide information that helps future developers (including yourself) understand these changes.
 
-## 🗂 Changed Files:
+## 📁 Changed Files
 {files_str}
 
-## 📊 Change Statistics:
+## 📊 Change Statistics
 {diff_stats}
 
-## 💬 Related Conversations:
+## 💬 Related Conversations (last 3000 chars)
 {conversations[:3000]}
 
-## 📈 Development Process Analysis:
+## 📈 Development Process Analysis
 {process_analysis}
 
-**Core Principles:**
-- Focus on capturing context that would help understand this commit in the future
-- Include both successful and failed attempts to show the full development process
-- Document the "why" behind changes, not just the "what"
-- Be specific about technical details and implementation choices
+## Instructions
 
-Return JSON with these three key aspects:
+Respond in the following JSON format. Each field must be a **string**:
 
+```json
 {{
-  "what_changed": "Comprehensive list of all changes made in this commit. Include specific files, functions, classes, methods, logic modifications, and their exact locations. Mention added/removed/modified code sections. Be detailed and technically precise.",
+  "what_changed": "List specific changes comprehensively. Include file names, function/class names, added/modified/removed logic with exact locations. Include technical details and implementation choices.",
   
-  "conversation_flow": "The complete development journey from the conversations. Start with the initial request/problem, then describe how the discussion evolved - what approaches were tried first, what didn't work and why, what alternatives were considered, what challenges arose and how they were resolved. Include key decision points and reasoning behind technical choices.",
+  "conversation_flow": "Describe the complete development flow chronologically: (1) Initial request/problem → (2) First attempt and results → (3) Challenges faced and solutions → (4) Alternative approaches considered → (5) Final implementation decision. Include reasoning behind technical choices.",
   
-  "intent": "The core purpose and motivation behind these changes. If explicitly stated in conversations, quote the relevant parts. Otherwise, infer from the context. Why was this work necessary? What specific problem does it solve? What goal does it achieve? How does it improve the codebase?"
+  "intent": "Explain the core purpose and motivation for these changes. Quote relevant parts from conversations if explicitly stated, otherwise infer from context. Clearly describe the specific problem being solved and the goal being achieved."
 }}
+```
 
-JSON response:"""
+## Core Principles
+- ✅ Write so future readers understand "why this was implemented this way"
+- ✅ Include failed attempts and their reasons to document the full development process
+- ✅ Document technical decisions and trade-offs clearly
+- ✅ Use specific, searchable technical terms
+
+Return only JSON:"""
 
 
 def simplified_analysis(conversations: str, staged_files: List[str], diff_stats: str) -> str:
     """Simplified retry prompt in English"""
     files_str = ', '.join(staged_files)
     
-    return f"""Provide a concise commit analysis for context.
+    return f"""Provide a concise and clear summary of this commit.
 
-## 💬 Conversations:
+## 💬 Conversation Content
 {conversations}
 
-## 📁 Files:
+## 📁 Changed Files
 {files_str}
 
-## 📊 Changes:
+## 📊 Change Statistics
 {diff_stats}
 
-Return a brief JSON summary:
+## Instructions
 
+Return JSON in the following format. Each field should be a concise 1-2 sentence string:
+
+```json
 {{
-  "what_changed": "Key modifications made (files, functions, logic)",
-  "conversation_flow": "How the development discussion progressed",
-  "intent": "Purpose of changes (explicit or inferred)"
+  "what_changed": "Summarize which files and features were changed",
+  "conversation_flow": "Describe key steps in the development process",
+  "intent": "State the purpose of this change and problem being solved"
 }}
+```
 
-JSON response:"""
+Return only JSON:"""
 
 
 # Export dictionary for compatibility
