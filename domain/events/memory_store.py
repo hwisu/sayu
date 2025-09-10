@@ -27,18 +27,22 @@ class InMemoryEventStore:
             self.insert(event)
     
     def find_by_time_range(self, start_ms: int, end_ms: int) -> List[Event]:
-        """Find events within time range"""
-        return [
+        """Find events within time range, sorted by timestamp"""
+        events = [
             event for event in self.events
             if start_ms <= event.ts <= end_ms
         ]
+        # Sort by timestamp (chronological order)
+        return sorted(events, key=lambda e: e.ts)
     
     def find_by_repo(self, repo: str, start_ms: int, end_ms: int) -> List[Event]:
-        """Find events by repository and time range"""
-        return [
+        """Find events by repository and time range, sorted by timestamp"""
+        events = [
             event for event in self.events
             if event.repo == repo and start_ms <= event.ts <= end_ms
         ]
+        # Sort by timestamp (chronological order)
+        return sorted(events, key=lambda e: e.ts)
     
     def get_last_commit_time(self, repo: str) -> Optional[int]:
         """Get timestamp of last commit for repo"""

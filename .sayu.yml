@@ -1,18 +1,11 @@
 # Sayu Configuration
 # 커밋에 '왜'를 남기는 개인 로컬 블랙박스
 
+language: ko              # 언어 설정 (ko, en)
+commitTrailer: true       # 커밋 메시지에 AI 분석 추가
+
 connectors:
-  claude: true
-  cursor: true
-  editor: true
+  claude: true            # Claude Desktop 대화 수집
+  cursor: true            # Cursor 편집기 대화 수집
   cli:
-    mode: "zsh-preexec"   # or "atuin" | "off"
-
-privacy:
-  maskSecrets: true       # 민감정보 마스킹 여부
-  masks:                  # 추가 마스킹 패턴 (정규식)
-    - "AKIA[0-9A-Z]{16}"  # AWS Access Key
-    - "(?i)authorization:\\s*Bearer\\s+[A-Za-z0-9._-]+"
-
-output:
-  commitTrailer: true     # 커밋 메시지에 트레일러 추가
+    mode: "zsh-preexec"   # CLI 명령어 수집 (또는 "off")
