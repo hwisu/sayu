@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 
-Capture the "why" behind your code changes from AI conversations.
+Automatically capture context from AI conversations and add it to your git commits.
 
 ## Quick Start
 
@@ -32,20 +32,29 @@ Your commits will automatically include AI-analyzed context.
 
 ## Features
 
-- Collects conversations from Cursor & Claude Desktop
-- Adds meaningful context to git commits
+- Collects conversations from Cursor, Claude Desktop, and shell commands
+- Automatically adds AI-generated context to commits
+- Hash-based deduplication prevents duplicate events
+- Time-range aware collection (only events since last commit)
 - Processes everything locally
-- Never blocks commits
-- Written in Rust for performance and reliability
+- Never blocks commits on errors
+- Written in Rust for performance
 
 ## Commands
 
 ```bash
-sayu --version    # Show version
-sayu health       # Check status
-sayu init         # Initialize in repository
-sayu show -n 5    # Show recent events
-sayu uninstall    # Remove from repository
+sayu --version       # Show version
+sayu health          # Check system status
+sayu init            # Initialize in repository
+sayu list -n 20      # List recent events
+sayu list --collect  # Collect fresh events before listing
+sayu commit <hash>   # Show context for specific commit
+sayu show -n 5       # Show recent commit context
+sayu uninstall       # Remove from repository
+
+# Pipe to other tools for analysis
+sayu commit <hash> | gpt -c "Summarize this commit's context"
+sayu list -v | gpt -c "What was I working on?"
 ```
 
 ## Configuration
