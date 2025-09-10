@@ -99,12 +99,10 @@ class CliCollector:
             source=event.source,
             kind=event.kind,
             repo=event.repo,
+            text=text,
             cwd=event.cwd,
             file=event.file,
-            range=event.range,
             actor=event.actor,
-            text=text,
-            url=event.url,
             meta=event.meta
         )
     

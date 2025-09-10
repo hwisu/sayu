@@ -91,17 +91,14 @@ class ConversationCollector(ABC):
             return None
         
         return Event(
-            id=str(uuid.uuid4()),
             ts=message['timestamp'],
             source=self.get_event_source(),
             kind=EventKind.CONVERSATION,
             repo=self.repo_root,
+            text=text[:5000],  # Limit text length
             cwd=self.repo_root,
             file=message.get('file'),
-            range=None,
             actor=actor,
-            text=text[:5000],  # Limit text length
-            url=None,
             meta=message.get('meta', {})
         )
     
@@ -111,8 +108,9 @@ class ConversationCollector(ABC):
         accessible = sum(1 for p in paths if p.exists())
         
         return {
-            'status': 'ok' if accessible > 0 else 'warning',
-            'message': f"Found {accessible}/{len(paths)} conversation files"
+            'ok': accessible > 0,
+            'reason': f"Found {accessible}/{len(paths)} conversation files",
+            'conversations': accessible
         }
 
 
@@ -195,21 +193,9 @@ class CursorConversationCollector(ConversationCollector):
     
     def get_conversation_paths(self) -> List[Path]:
         """Get Cursor conversation file paths"""
-        # Common Cursor storage locations
-        cursor_paths = [
-            Path.home() / 'Library' / 'Application Support' / 'Cursor' / 'User' / 'History',
-            Path.home() / '.cursor' / 'History',
-            Path.home() / '.config' / 'Cursor' / 'User' / 'History',
-        ]
-        
-        conversation_files = []
-        for base_path in cursor_paths:
-            if base_path.exists():
-                # Look for conversation or history files
-                for pattern in ['*.json', '*.jsonl', '**/conversation*.json']:
-                    conversation_files.extend(base_path.glob(pattern))
-        
-        return conversation_files
+        # Cursor doesn't persist conversation history in accessible files
+        # Return empty list for now
+        return []
     
     def parse_conversation_file(self, file_path: Path) -> List[Dict[str, Any]]:
         """Parse Cursor conversation file"""
