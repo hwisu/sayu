@@ -100,12 +100,37 @@ class LLMApiClient:
             response.raise_for_status()
             
             data = response.json()
-            if data.get('candidates') and data['candidates'][0]:
-                content = data['candidates'][0].get('content')
-                if content and content.get('parts') and content['parts'][0]:
-                    return content['parts'][0]['text'].strip()
             
-            raise ValueError('Invalid Gemini response structure')
+            # Debug logging to see the actual response structure
+            if os.getenv('SAYU_DEBUG'):
+                import json
+                print(f"[DEBUG] Gemini response: {json.dumps(data, indent=2)[:500]}...")
+            
+            if data.get('candidates') and data['candidates'][0]:
+                candidate = data['candidates'][0]
+                
+                # Check if the model hit token limit or other issues
+                finish_reason = candidate.get('finishReason', '')
+                if finish_reason == 'MAX_TOKENS':
+                    # Return empty response when hitting token limit
+                    return ''
+                
+                content = candidate.get('content')
+                if content and content.get('parts'):
+                    # Handle both list and single part responses
+                    parts = content['parts']
+                    if isinstance(parts, list) and parts:
+                        text = parts[0].get('text', '')
+                        if text:
+                            return text.strip()
+                    
+                    # If no text in parts but model responded, return empty
+                    return ''
+            
+            # More detailed error with response structure
+            import json
+            error_msg = f'Invalid Gemini response structure. Response: {json.dumps(data, indent=2)[:500]}...'
+            raise ValueError(error_msg)
     
     
     
