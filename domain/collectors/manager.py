@@ -11,7 +11,8 @@ from domain.git.hooks import GitHookManager
 from domain.events.types import Event
 from .git import GitCollector
 from .cli import CliCollector
-from .conversation import ClaudeConversationCollector, CursorConversationCollector
+from .claude import ClaudeConversationCollector
+from .cursor import CursorConversationCollector
 
 
 class CollectorManager:

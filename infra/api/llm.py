@@ -1,7 +1,6 @@
 """LLM API client for Sayu using httpx with caching"""
 
 import hashlib
-import json
 import os
 import time
 from typing import Dict, Any, Optional, Tuple
@@ -18,7 +17,7 @@ class LLMApiClient:
     
     # Simple in-memory cache for API responses
     _cache: Dict[str, Tuple[str, float]] = {}
-    CACHE_TTL = 300  # 5 minutes
+    CACHE_TTL = 600  # 10 minutes - longer cache for better performance
     
     @classmethod
     def call_llm(cls, prompt: str, use_cache: bool = True) -> str:
@@ -71,7 +70,9 @@ class LLMApiClient:
         if not api_key:
             raise ValueError('SAYU_GEMINI_API_KEY not found in environment')
         
-        url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+        # Use faster model if available
+        model = os.getenv('SAYU_GEMINI_MODEL', 'gemini-2.5-flash')
+        url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
         
         payload = {
             "contents": [{
@@ -83,7 +84,9 @@ class LLMApiClient:
                 "temperature": LLM_TEMPERATURE,
                 "maxOutputTokens": LLM_MAX_OUTPUT_TOKENS,
                 "candidateCount": 1,
-                "responseMimeType": "application/json"
+                "responseMimeType": "application/json",
+                "topP": 0.8,
+                "topK": 20
             }
         }
         
@@ -92,7 +95,7 @@ class LLMApiClient:
             'Content-Type': 'application/json'
         }
         
-        with httpx.Client(timeout=30.0) as client:
+        with httpx.Client(timeout=10.0) as client:
             response = client.post(url, headers=headers, json=payload)
             response.raise_for_status()
             

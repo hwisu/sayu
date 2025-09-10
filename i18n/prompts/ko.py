@@ -4,39 +4,25 @@ from typing import List
 
 
 def main_analysis(conversations: str, staged_files: List[str], diff_stats: str, process_analysis: str) -> str:
-    """Main LLM analysis prompt in Korean"""
-    files_str = ', '.join(staged_files)
+    """Main LLM analysis prompt in Korean - optimized for speed"""
+    files_str = ', '.join(staged_files[:5])  # Limit to 5 files for speed
+    if len(staged_files) > 5:
+        files_str += f" (+{len(staged_files)-5} more)"
     
-    return f"""이 커밋의 효과적인 맥락을 제공하기 위해 분석하세요.
+    return f"""커밋 맥락 분석:
 
-## 🗂 변경된 파일:
-{files_str}
+파일: {files_str}
+통계: {diff_stats}
 
-## 📊 변경 통계:
-{diff_stats}
+대화:
+{conversations[:2000]}  # Limit conversation length
 
-## 💬 관련 대화:
-{conversations}
-
-## 📈 대화 패턴 분석:
-{process_analysis}
-
-**핵심 원칙:**
-- 나중에 이 커밋을 이해하는 데 도움이 될 맥락 포착에 집중
-- 전체 개발 과정을 보여주기 위해 성공과 실패한 시도 모두 포함
-- "무엇을" 했는지뿐만 아니라 "왜" 했는지를 문서화
-
-다음 세 가지 핵심 측면으로 JSON을 반환하세요:
-
+JSON 반환:
 {{
-  "what_changed": "이 커밋에서 수정된 내용을 명확한 한글 문장으로 설명하세요. 구체적인 파일명과 변경 사항을 자연스러운 문장으로 작성하세요.",
-  
-  "conversation_flow": "대화의 흐름을 시간순으로 한글 문장으로 설명하세요. '~를 논의했다', '~를 시도했다', '~문제를 발견했다' 등의 형태로 작성하세요.",
-  
-  "intent": "이 변경의 목적을 간결한 한글 문장으로 설명하세요. 왜 이 작업을 했는지 명확하게 표현하세요."
-}}
-
-JSON response:"""
+  "what_changed": "수정 내용 한글 설명",
+  "conversation_flow": "대화 흐름 요약", 
+  "intent": "변경 목적"
+}}"""
 
 
 def simplified_analysis(conversations: str, staged_files: List[str], diff_stats: str) -> str:
