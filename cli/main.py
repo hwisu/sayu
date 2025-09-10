@@ -2,7 +2,6 @@
 """Sayu CLI - AI-Powered Commit Context Tracker"""
 
 import sys
-import os
 import click
 
 from domain.git.hooks import GitHookManager
@@ -17,7 +16,7 @@ from i18n import i18n
 
 
 @click.group()
-@click.version_option(version='0.6.0', prog_name='sayu')
+@click.version_option(version='0.7.0', prog_name='sayu')
 def cli():
     """Sayu - Automatically capture the 'why' behind your code changes"""
     pass
