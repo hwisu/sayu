@@ -191,14 +191,6 @@ impl CursorCollector {
                     return;
                 }
                 
-                // Skip tool usage messages
-                if prompts::is_tool_usage(content) {
-                    if self.debug {
-                        println!("Skipping tool usage message in Cursor");
-                    }
-                    return;
-                }
-                
                 // Determine actor based on message type
                 let actor = if msg_type == 1 {
                     Actor::User

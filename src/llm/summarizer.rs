@@ -115,7 +115,7 @@ impl EventSummarizer {
 대화 흐름:
 (개발 과정에서 어떤 시행착오나 고민이 있었는지 설명)
 
----FIN---"#,
+<=="#,
             context, commit_message
         )
     }
@@ -141,15 +141,15 @@ What Changed:
 Conversation Flow:
 (Describe any trial-and-error or considerations during development)
 
----END---"#,
+<=="#,
             context, commit_message
         )
     }
     
     fn format_as_trailer(&self, summary: &str, language: Language) -> String {
         let header = match language {
-            Language::Ko => "---사유---\n\n",
-            Language::En => "---Reason---\n\n",
+            Language::Ko => "==>사유\n\n",
+            Language::En => "==>Reason\n\n",
         };
         
         format!("\n\n{}\n{}", header, summary)

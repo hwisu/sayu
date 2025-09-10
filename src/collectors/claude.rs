@@ -155,14 +155,6 @@ impl ClaudeCollector {
                         continue;
                     }
                     
-                    // Skip tool usage messages
-                    if prompts::is_tool_usage(&text) {
-                        if self.debug {
-                            println!("Skipping tool usage message");
-                        }
-                        continue;
-                    }
-                    
                     // Determine actor based on role
                     let actor = match inner.role.as_deref() {
                         Some("user") | Some("human") => Actor::User,
