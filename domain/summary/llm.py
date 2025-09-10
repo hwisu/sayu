@@ -9,10 +9,7 @@ from domain.events.types import Event
 from infra.api.llm_factory import LLMFactory
 from i18n import i18n
 from shared.constants import (
-    MAX_CONVERSATION_COUNT, MAX_CONVERSATION_LENGTH,
-    MAX_SIMPLIFIED_CONVERSATIONS, MAX_SIMPLIFIED_LENGTH,
-    MAX_RAW_RESPONSE_LENGTH, MAX_LINE_LENGTH,
-    SUMMARY_SEPARATOR, SUMMARY_FOOTER
+    MAX_CONVERSATION_COUNT, MAX_CONVERSATION_LENGTH
 )
 
 
@@ -52,9 +49,10 @@ class LLMSummaryGenerator:
     @staticmethod
     def generate_simplified(llm_events: List[Event], staged_files: List[str], diff_stats: str) -> str:
         """Generate simplified LLM summary"""
-        recent_conversations = llm_events[-MAX_SIMPLIFIED_CONVERSATIONS:]
+        # 66 conversations for simplified mode (2/3 of MAX_CONVERSATION_COUNT)
+        recent_conversations = llm_events[-66:]
         conversations_text = '\n'.join([
-            f"[{event.actor.value if event.actor else 'unknown'}]: {event.text[:MAX_SIMPLIFIED_LENGTH]}"
+            f"[{event.actor.value if event.actor else 'unknown'}]: {event.text[:2000]}"  # 2000 chars for simplified (1/10 of MAX_CONVERSATION_LENGTH)
             for event in recent_conversations
         ])
         
@@ -104,7 +102,7 @@ class LLMSummaryGenerator:
         i18n_manager = i18n()
         outputs = i18n_manager.get_outputs()
         
-        lines.append(SUMMARY_SEPARATOR.rstrip())
+        lines.append('---思惟---\n\n'.rstrip())  # Summary separator
         
         # Handle intent
         if parsed.get('intent'):
@@ -136,14 +134,14 @@ class LLMSummaryGenerator:
             lines.append(LLMSummaryGenerator._wrap_text(str(conversation_flow_value), 2))
             lines.append('')
         
-        lines.append(SUMMARY_FOOTER.strip())
+        lines.append('\n---FIN---'.strip())  # Summary footer
         
         return '\n'.join(lines)
     
     @staticmethod
     def _wrap_text(text: str, indent: int = 0) -> str:
         """Wrap text to specified line length with indentation, preserving original line breaks"""
-        max_line_length = MAX_LINE_LENGTH
+        max_line_length = 100  # Maximum line length in commit trailer (Git standard)
         indent_str = ' ' * indent
         
         # Ensure text is a string
@@ -189,19 +187,19 @@ class LLMSummaryGenerator:
     def _format_raw_response(text: str) -> str:
         """Format raw response as fallback"""
         lines = []
-        lines.append(SUMMARY_SEPARATOR.rstrip())
+        lines.append('---思惟---\n\n'.rstrip())  # Summary separator
         
         # Ensure text is a string
         if not isinstance(text, str):
             text = str(text) if text is not None else "No response"
         
         clean_text = re.sub(r'[\n\r]+', ' ', text).strip()
-        if len(clean_text) > MAX_RAW_RESPONSE_LENGTH:
-            lines.append(f"Summary: {clean_text[:MAX_RAW_RESPONSE_LENGTH]}...")
+        if len(clean_text) > 10000:  # Maximum raw response length
+            lines.append(f"Summary: {clean_text[:10000]}...")
         else:
             lines.append(f"Summary: {clean_text}")
         
-        lines.append(SUMMARY_FOOTER.strip())
+        lines.append('\n---FIN---'.strip())  # Summary footer
         
         return '\n'.join(lines)
     
