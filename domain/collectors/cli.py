@@ -215,17 +215,14 @@ add-zsh-hook precmd sayu_precmd
         kind = self._categorize_command(entry['cmd'])
         
         return Event(
-            id=str(uuid.uuid4()),
             ts=entry['ts'],
             source=EventSource.CLI,
             kind=kind,
             repo=self.repo_root,
             cwd=entry['cwd'],
             file=None,
-            range=None,
             actor=Actor.USER,
             text=entry['cmd'],
-            url=None,
             meta={
                 'exitCode': entry['exitCode'],
                 'duration': entry['duration'],

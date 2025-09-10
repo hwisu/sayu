@@ -103,17 +103,14 @@ class GitCollector:
                         # Create events for file changes
                         for file_path, file_diff in changes['file_diffs'].items():
                             file_event = Event(
-                                id=str(uuid.uuid4()),
                                 ts=commit['timestamp'],
                                 source=EventSource.GIT,
                                 kind=EventKind.COMMIT,
                                 repo=self.repo_root,
                                 cwd=self.repo_root,
                                 file=file_path,
-                                range=None,
                                 actor=Actor.USER,
                                 text=file_diff[:5000],  # Limit to 5000 chars
-                                url=None,
                                 meta={
                                     'type': 'file_change',
                                     'commit': commit_hash,
