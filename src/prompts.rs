@@ -1,7 +1,6 @@
 /// All user-facing strings and prompts for Sayu
 /// 
 /// This module centralizes all text constants for easy maintenance and localization
-
 // CLI Messages
 pub const MSG_INITIALIZING: &str = "🔧 Initializing Sayu...";
 pub const MSG_REPOSITORY: &str = "Repository: ";

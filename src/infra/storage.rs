@@ -35,18 +35,34 @@ impl Storage {
             [],
         )?;
         
-        // Create indices for better query performance
+        // Create optimized indices for better query performance
+        // Composite index for common query patterns
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_events_repo_id ON events(repo, id DESC)",
+            [],
+        )?;
+        // Index for source filtering
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_events_source_id ON events(source, id DESC)",
+            [],
+        )?;
+        // Index for time-based queries
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_events_id ON events(id DESC)",
             [],
         )?;
+        // Index for cleanup operations
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_events_repo ON events(repo)",
+            "CREATE INDEX IF NOT EXISTS idx_events_id_asc ON events(id ASC)",
             [],
         )?;
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_events_source ON events(source)",
-            [],
+        
+        // Set pragmas for better performance
+        conn.execute_batch(
+            "PRAGMA journal_mode = WAL;
+             PRAGMA synchronous = NORMAL;
+             PRAGMA cache_size = 10000;
+             PRAGMA temp_store = MEMORY;"
         )?;
         
         Ok(Self { conn })
@@ -71,6 +87,35 @@ impl Storage {
             ],
         )?;
         
+        Ok(())
+    }
+    
+    /// Save multiple events in a single transaction for better performance
+    pub fn save_events_batch(&self, events: &[Event]) -> Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+        
+        {
+            let mut stmt = tx.prepare(
+                "INSERT OR REPLACE INTO events (id, source, kind, repo, text, actor, meta, branch)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"
+            )?;
+            
+            for event in events {
+                let meta_json = serde_json::to_string(&event.meta)?;
+                stmt.execute(params![
+                    event.id,
+                    format!("{:?}", event.source).to_lowercase(),
+                    format!("{:?}", event.kind).to_lowercase(),
+                    event.repo,
+                    event.text,
+                    event.actor.as_ref().map(|a| format!("{a:?}").to_lowercase()),
+                    meta_json,
+                    event.branch,
+                ])?;
+            }
+        }
+        
+        tx.commit()?;
         Ok(())
     }
     

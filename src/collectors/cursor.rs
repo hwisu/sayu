@@ -1,12 +1,11 @@
-use anyhow::Result;
+use anyhow::{Result, Context};
 use async_trait::async_trait;
 use rusqlite::Connection;
 use serde::Deserialize;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use crate::domain::{Event, EventKind, EventSource, Actor};
-use crate::collectors::Collector;
-use crate::prompts;
+use crate::collectors::{Collector, base::{BaseCollector, CollectorResult}};
 
 #[derive(Debug, Clone)]
 pub struct CursorCollector {
@@ -35,6 +34,22 @@ struct CursorMessage {
     timestamp: Option<i64>,
 }
 
+impl Default for CursorCollector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BaseCollector for CursorCollector {
+    fn debug(&self) -> bool {
+        self.debug
+    }
+    
+    fn source_name(&self) -> &str {
+        "Cursor"
+    }
+}
+
 impl CursorCollector {
     pub fn new() -> Self {
         Self {
@@ -44,190 +59,227 @@ impl CursorCollector {
     
     fn get_db_paths(&self) -> Vec<PathBuf> {
         let mut paths = Vec::new();
-        let home = dirs::home_dir().unwrap_or_default();
         
-        // Global database path (macOS) - this is where conversations are actually stored
-        let global_db = home.join("Library/Application Support/Cursor/User/globalStorage/state.vscdb");
-        if global_db.exists() {
-            paths.push(global_db);
-        }
-        
-        // Alternative global database path (Linux/Windows)
-        let alt_global_db = home.join(".config/Cursor/User/globalStorage/state.vscdb");
-        if alt_global_db.exists() {
-            paths.push(alt_global_db);
-        }
-        
-        // Windows path
-        if cfg!(windows) {
-            let windows_db = home.join("AppData/Roaming/Cursor/User/globalStorage/state.vscdb");
-            if windows_db.exists() {
-                paths.push(windows_db);
+        if let Some(home) = dirs::home_dir() {
+            // Platform-specific database paths
+            let platform_paths = self.get_platform_specific_paths(&home);
+            
+            for path in platform_paths {
+                if path.exists() {
+                    paths.push(path);
+                }
             }
         }
         
-        if self.debug {
-            println!("Found {} Cursor database(s)", paths.len());
-            for path in &paths {
-                println!("  - {:?}", path);
-            }
+        self.debug_log(&format!("Found {} Cursor database(s)", paths.len()));
+        for path in &paths {
+            self.debug_log(&format!("  - {:?}", path));
         }
         
         paths
     }
     
-    fn parse_cursor_database(&self, db_path: &Path, repo_name: &str, since_ts: Option<i64>) -> Result<Vec<Event>> {
-        let conn = Connection::open(db_path)?;
-        let mut events = Vec::new();
+    fn get_platform_specific_paths(&self, home: &Path) -> Vec<PathBuf> {
+        vec![
+            // macOS
+            home.join("Library/Application Support/Cursor/User/globalStorage/state.vscdb"),
+            // Linux
+            home.join(".config/Cursor/User/globalStorage/state.vscdb"),
+            // Windows
+            home.join("AppData/Roaming/Cursor/User/globalStorage/state.vscdb"),
+        ]
+    }
+    
+    fn check_table_exists(&self, conn: &Connection, table_name: &str) -> Result<bool> {
+        let query = "SELECT name FROM sqlite_master WHERE type='table' AND name=?";
+        let exists = conn.prepare(query)?
+            .query_map([table_name], |row| row.get::<_, String>(0))?
+            .count() > 0;
+        Ok(exists)
+    }
+    
+    fn query_bubble_entries(&self, conn: &Connection) -> CollectorResult<Vec<(i64, String, String)>> {
+        let query = "SELECT rowid, key, value FROM cursorDiskKV \
+                     WHERE key LIKE 'bubbleId:%' \
+                     AND value LIKE '%\"text\":%' \
+                     ORDER BY rowid";
+        
+        let mut stmt = conn.prepare(query)?;
+        let entries = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+        
+        Ok(entries)
+    }
+    
+    fn parse_cursor_database(&self, db_path: &Path, repo_name: &str, since_ts: Option<i64>) -> CollectorResult<Vec<Event>> {
+        let conn = Connection::open(db_path)
+            .with_context(|| format!("Failed to open database: {:?}", db_path))?;
         
         // Check if cursorDiskKV table exists
-        let table_check = "SELECT name FROM sqlite_master WHERE type='table' AND name='cursorDiskKV'";
-        let has_cursor_table = conn.prepare(table_check)?
-            .query_map([], |row| row.get::<_, String>(0))?
-            .count() > 0;
-        
-        if !has_cursor_table {
-            if self.debug {
-                println!("Cursor: cursorDiskKV table not found");
-            }
-            return Ok(events);
+        if !self.check_table_exists(&conn, "cursorDiskKV")? {
+            self.debug_log("cursorDiskKV table not found");
+            return Ok(vec![]);
         }
         
-        // Get all bubble entries directly from cursorDiskKV with rowid for ordering
-        // Use rowid as a timestamp approximation since Cursor doesn't store actual timestamps
-        let all_bubbles_query = "SELECT rowid, key, value FROM cursorDiskKV WHERE key LIKE 'bubbleId:%' AND value LIKE '%\"text\":%' ORDER BY rowid";
-        if let Ok(mut stmt) = conn.prepare(all_bubbles_query) {
-            if let Ok(mut rows) = stmt.query([]) {
-                let mut count = 0;
-                while let Ok(Some(row)) = rows.next() {
-                    if let Ok(rowid) = row.get::<_, i64>(0) {
-                        if let Ok(key) = row.get::<_, String>(1) {
-                            if let Ok(value) = row.get::<_, String>(2) {
-                                // Use rowid as a pseudo-timestamp (multiply by 1000 to simulate milliseconds)
-                                // This gives us ordering but not real timestamps
-                                let pseudo_timestamp = rowid * 1000;
-                                self.parse_conversation_data_with_timestamp(&key, &value, repo_name, pseudo_timestamp, since_ts, &mut events);
-                                count += 1;
-                            }
-                        }
-                    }
-                }
-                if self.debug {
-                    println!("Cursor: Processed {} bubble entries", count);
-                }
+        let entries = self.query_bubble_entries(&conn)?;
+        let mut events = Vec::new();
+        
+        self.debug_log(&format!("Processing {} bubble entries", entries.len()));
+        
+        for (rowid, key, value) in entries {
+            // Use rowid as a pseudo-timestamp
+            let pseudo_timestamp = rowid * 1000;
+            
+            if let Some(event) = self.parse_message(&key, &value, repo_name, pseudo_timestamp, since_ts) {
+                events.push(event);
             }
         }
         
         Ok(events)
     }
     
-    fn parse_conversation_data_with_timestamp(&self, key: &str, value: &str, repo_name: &str, timestamp: i64, since_ts: Option<i64>, events: &mut Vec<Event>) {
+    fn parse_message(
+        &self,
+        key: &str,
+        value: &str,
+        repo_name: &str,
+        fallback_timestamp: i64,
+        since_ts: Option<i64>,
+    ) -> Option<Event> {
         // Skip if before since_ts
         if let Some(since) = since_ts {
-            if timestamp <= since {
-                return;
+            if fallback_timestamp <= since {
+                return None;
             }
         }
         
-        self.parse_conversation_data_internal(key, value, repo_name, timestamp, events);
+        self.parse_message_internal(key, value, repo_name, fallback_timestamp)
     }
     
-    #[allow(dead_code)]
-    fn parse_conversation_data(&self, key: &str, value: &str, repo_name: &str, _since_ts: Option<i64>, events: &mut Vec<Event>) {
-        // Fallback for when we don't have a timestamp
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        self.parse_conversation_data_internal(key, value, repo_name, timestamp, events);
-    }
-    
-    fn parse_conversation_data_internal(&self, key: &str, value: &str, repo_name: &str, fallback_timestamp: i64, events: &mut Vec<Event>) {
-        if self.debug {
-            println!("Cursor: Processing conversation for key: {}", key);
+    fn parse_message_internal(
+        &self,
+        key: &str,
+        value: &str,
+        repo_name: &str,
+        fallback_timestamp: i64,
+    ) -> Option<Event> {
+        self.debug_log(&format!("Processing conversation for key: {}", key));
+        
+        // Parse the conversation JSON
+        let msg_data: Value = match serde_json::from_str(value) {
+            Ok(data) => data,
+            Err(e) => {
+                self.debug_log(&format!("Failed to parse JSON for key {}: {}", key, e));
+                return None;
+            }
+        };
+        
+        // Extract message details
+        let msg_type = msg_data.get("type").and_then(|t| t.as_i64()).unwrap_or(2);
+        let content = msg_data.get("text").and_then(|c| c.as_str())?;
+        
+        if content.trim().is_empty() {
+            return None;
         }
         
-        // Parse the conversation JSON - each bubble entry is a single message
-        if let Ok(msg_data) = serde_json::from_str::<Value>(value) {
-            // Get message type (1 = user, 2 = assistant)
-            let msg_type = msg_data.get("type").and_then(|t| t.as_i64()).unwrap_or(2);
-            
-            // Get message text
-            let content = msg_data.get("text").and_then(|c| c.as_str());
-            
-            if let Some(content) = content {
-                // Try to get actual timestamp from various timing fields
-                // Priority order:
-                // 1. timingInfo.clientRpcSendTime - when request was sent (most accurate for user messages)
-                // 2. timingInfo.clientSettleTime - when response was received (good for assistant messages)
-                // 3. timingInfo.clientEndTime - when operation completed
-                // 4. timingInfo.clientStartTime - when operation began
-                // 5. Direct clientRpcSendTime field
-                // 6. Fallback to rowid-based timestamp
-                let timestamp = msg_data.get("timingInfo")
-                    .and_then(|ti| {
-                        // For user messages (type 1), prefer send time
-                        // For assistant messages (type 2), prefer settle time
-                        if msg_type == 1 {
-                            ti.get("clientRpcSendTime").and_then(|t| t.as_i64())
-                                .or_else(|| ti.get("clientStartTime").and_then(|t| t.as_f64()).map(|t| t as i64))
-                                .or_else(|| ti.get("clientEndTime").and_then(|t| t.as_i64()))
-                                .or_else(|| ti.get("clientSettleTime").and_then(|t| t.as_i64()))
-                        } else {
-                            ti.get("clientSettleTime").and_then(|t| t.as_i64())
-                                .or_else(|| ti.get("clientEndTime").and_then(|t| t.as_i64()))
-                                .or_else(|| ti.get("clientRpcSendTime").and_then(|t| t.as_i64()))
-                                .or_else(|| ti.get("clientStartTime").and_then(|t| t.as_f64()).map(|t| t as i64))
-                        }
-                    })
-                    .or_else(|| msg_data.get("clientRpcSendTime").and_then(|t| t.as_i64()))
-                    .or_else(|| msg_data.get("clientSettleTime").and_then(|t| t.as_i64()))
-                    .or_else(|| msg_data.get("clientEndTime").and_then(|t| t.as_i64()))
-                    .unwrap_or(fallback_timestamp);
-                
-                if self.debug && timestamp == fallback_timestamp {
-                    println!("Cursor: No timing info found, using fallback timestamp for message type {}", msg_type);
-                }
-                
-                // Skip empty messages
-                if content.trim().is_empty() {
-                    return;
-                }
-                
-                // Determine actor based on message type
-                let actor = if msg_type == 1 {
-                    Actor::User
-                } else {
-                    Actor::Assistant
-                };
-                
-                // Create event
-                let mut event = Event::new(
-                    EventSource::Cursor,
-                    EventKind::Conversation,
-                    repo_name.to_string(),
-                    content.to_string(),
-                );
-                
-                event = event.with_timestamp(timestamp).with_actor(actor);
-                
-                // Add metadata
-                if let Some(bubble_id) = msg_data.get("bubbleId").and_then(|id| id.as_str()) {
-                    event = event.with_meta("bubble_id".to_string(), serde_json::Value::String(bubble_id.to_string()));
-                }
-                
-                if let Some(server_bubble_id) = msg_data.get("serverBubbleId").and_then(|id| id.as_str()) {
-                    event = event.with_meta("server_bubble_id".to_string(), serde_json::Value::String(server_bubble_id.to_string()));
-                }
-                
-                events.push(event);
-                
-                if self.debug {
-                    println!("Cursor: Added {} message from bubble", if msg_type == 1 { "user" } else { "assistant" });
-                }
-            } else if self.debug {
-                println!("Cursor: No text field found in message data");
-            }
-        } else if self.debug {
-            println!("Cursor: Failed to parse JSON for key: {}", key);
+        // Extract timestamp from various fields
+        let timestamp = self.extract_cursor_timestamp(&msg_data, msg_type, fallback_timestamp);
+        
+        // Determine actor
+        let actor = if msg_type == 1 {
+            Actor::User
+        } else {
+            Actor::Assistant
+        };
+        
+        // Create event
+        let mut event = self.create_event(
+            EventSource::Cursor,
+            EventKind::Conversation,
+            repo_name.to_string(),
+            content.to_string(),
+            timestamp,
+            actor,
+        );
+        
+        // Add metadata
+        if let Some(bubble_id) = msg_data.get("bubbleId").and_then(|id| id.as_str()) {
+            event = event.with_meta("bubble_id".to_string(), serde_json::Value::String(bubble_id.to_string()));
         }
+        
+        if let Some(server_bubble_id) = msg_data.get("serverBubbleId").and_then(|id| id.as_str()) {
+            event = event.with_meta("server_bubble_id".to_string(), serde_json::Value::String(server_bubble_id.to_string()));
+        }
+        
+        self.debug_log(&format!("Added {} message from bubble", 
+            if msg_type == 1 { "user" } else { "assistant" }));
+        
+        Some(event)
+    }
+    
+    fn extract_cursor_timestamp(&self, msg_data: &Value, msg_type: i64, fallback: i64) -> i64 {
+        // Try to extract timestamp from timing info
+        let timestamp = msg_data.get("timingInfo")
+            .and_then(|ti| self.extract_timing_info(ti, msg_type))
+            .or_else(|| self.extract_direct_timestamp(msg_data))
+            .unwrap_or(fallback);
+        
+        if timestamp == fallback {
+            self.debug_log(&format!("No timing info found, using fallback timestamp for message type {}", msg_type));
+        }
+        
+        timestamp
+    }
+    
+    fn extract_timing_info(&self, timing_info: &Value, msg_type: i64) -> Option<i64> {
+        // For user messages (type 1), prefer send time
+        // For assistant messages (type 2), prefer settle time
+        if msg_type == 1 {
+            timing_info.get("clientRpcSendTime").and_then(|t| t.as_i64())
+                .or_else(|| timing_info.get("clientStartTime").and_then(|t| t.as_f64()).map(|t| t as i64))
+                .or_else(|| timing_info.get("clientEndTime").and_then(|t| t.as_i64()))
+                .or_else(|| timing_info.get("clientSettleTime").and_then(|t| t.as_i64()))
+        } else {
+            timing_info.get("clientSettleTime").and_then(|t| t.as_i64())
+                .or_else(|| timing_info.get("clientEndTime").and_then(|t| t.as_i64()))
+                .or_else(|| timing_info.get("clientRpcSendTime").and_then(|t| t.as_i64()))
+                .or_else(|| timing_info.get("clientStartTime").and_then(|t| t.as_f64()).map(|t| t as i64))
+        }
+    }
+    
+    fn extract_direct_timestamp(&self, msg_data: &Value) -> Option<i64> {
+        msg_data.get("clientRpcSendTime").and_then(|t| t.as_i64())
+            .or_else(|| msg_data.get("clientSettleTime").and_then(|t| t.as_i64()))
+            .or_else(|| msg_data.get("clientEndTime").and_then(|t| t.as_i64()))
+    }
+    
+    fn collect_from_databases(&self, db_paths: Vec<PathBuf>, repo_name: &str, since_ts: Option<i64>) -> Vec<Event> {
+        let mut all_events = Vec::new();
+        
+        for db_path in db_paths {
+            self.debug_log(&format!("Parsing database: {:?}", db_path));
+            
+            match self.parse_cursor_database(&db_path, repo_name, since_ts) {
+                Ok(events) => {
+                    if !events.is_empty() {
+                        self.debug_log(&format!("Found {} events in {:?}", events.len(), db_path.file_name()));
+                    }
+                    all_events.extend(events);
+                },
+                Err(e) => {
+                    self.debug_error(&format!("Error parsing database {:?}", db_path), &e);
+                }
+            }
+        }
+        
+        all_events
     }
 }
 
@@ -238,50 +290,19 @@ impl Collector for CursorCollector {
     }
     
     async fn collect(&self, repo_root: &Path, since_ts: Option<i64>) -> Result<Vec<Event>> {
-        if self.debug {
-            println!("Cursor: Starting collection");
-        }
+        self.debug_log("Starting collection");
         
         let db_paths = self.get_db_paths();
         let repo_name = repo_root.file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
         
-        if self.debug {
-            println!("Cursor: Found {} database(s) to check", db_paths.len());
-            for (i, path) in db_paths.iter().enumerate() {
-                println!("Cursor: DB {}: {:?}", i + 1, path);
-            }
-        }
+        let mut all_events = self.collect_from_databases(db_paths, repo_name, since_ts);
         
-        let mut all_events = Vec::new();
-        
-        for db_path in db_paths {
-            if self.debug {
-                println!("Cursor: Parsing database: {:?}", db_path);
-            }
-            
-            match self.parse_cursor_database(&db_path, repo_name, since_ts) {
-                Ok(events) => {
-                    if self.debug {
-                        println!("Cursor: Found {} events in {:?}", events.len(), db_path.file_name());
-                    }
-                    all_events.extend(events);
-                },
-                Err(e) => {
-                    if self.debug {
-                        println!("Cursor: Error parsing database {:?}: {}", db_path, e);
-                    }
-                }
-            }
-        }
-        
-        if self.debug {
-            println!("Cursor: Total {} events collected", all_events.len());
-        }
+        self.debug_log(&format!("Total {} events collected", all_events.len()));
         
         // Sort by timestamp
-        all_events.sort_by_key(|e| e.id);
+        all_events = self.sort_events(all_events);
         
         Ok(all_events)
     }

@@ -1,3 +1,4 @@
+pub mod base;
 pub mod claude;
 pub mod cursor;
 pub mod shell;

@@ -327,41 +327,37 @@ async fn list_command(count: usize, source: Option<String>, verbose: bool, colle
             }
         );
         
-        // Store collected events
-        let mut total_stored = 0;
+        // Collect all events for batch storage
+        let mut all_events = Vec::new();
+        let debug = std::env::var("SAYU_DEBUG").is_ok();
         
         if let Ok(events) = claude_events {
-            for event in events {
-                if let Err(e) = storage.save_event(&event) {
-                    if std::env::var("SAYU_DEBUG").is_ok() {
-                        println!("Failed to save Claude event: {}", e);
-                    }
-                } else {
-                    total_stored += 1;
-                }
+            if debug && !events.is_empty() {
+                println!("Collected {} Claude events", events.len());
             }
+            all_events.extend(events);
         }
         
         if let Ok(events) = cursor_events {
-            for event in events {
-                if let Err(e) = storage.save_event(&event) {
-                    if std::env::var("SAYU_DEBUG").is_ok() {
-                        println!("Failed to save Cursor event: {}", e);
-                    }
-                } else {
-                    total_stored += 1;
-                }
+            if debug && !events.is_empty() {
+                println!("Collected {} Cursor events", events.len());
             }
+            all_events.extend(events);
         }
         
         if let Ok(events) = shell_events {
-            for event in events {
-                if let Err(e) = storage.save_event(&event) {
-                    if std::env::var("SAYU_DEBUG").is_ok() {
-                        println!("Failed to save CLI event: {}", e);
-                    }
-                } else {
-                    total_stored += 1;
+            if debug && !events.is_empty() {
+                println!("Collected {} Shell events", events.len());
+            }
+            all_events.extend(events);
+        }
+        
+        // Store all events in a single batch transaction
+        let total_stored = all_events.len();
+        if !all_events.is_empty() {
+            if let Err(e) = storage.save_events_batch(&all_events) {
+                if debug {
+                    println!("Failed to save events batch: {}", e);
                 }
             }
         }
