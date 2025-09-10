@@ -3,7 +3,6 @@
 from typing import List
 
 from domain.events.types import Event
-from shared.constants import MAX_FILE_DISPLAY
 
 
 class MinimalSummaryGenerator:
@@ -18,8 +17,9 @@ class MinimalSummaryGenerator:
         
         # File information
         if staged_files:
-            file_list = ', '.join(staged_files[:MAX_FILE_DISPLAY])
-            more = f" (+{len(staged_files) - MAX_FILE_DISPLAY} more)" if len(staged_files) > MAX_FILE_DISPLAY else ""
+            max_display = 3
+            file_list = ', '.join(staged_files[:max_display])
+            more = f" (+{len(staged_files) - max_display} more)" if len(staged_files) > max_display else ""
             lines.append(f"Files: {file_list}{more}")
         
         # Event information
