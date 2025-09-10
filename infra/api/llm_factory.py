@@ -72,7 +72,7 @@ class LLMFactory:
                 client = OpenRouterClient()
                 
                 # Use model from parameter, env, or default
-                model = model or os.getenv('OPENROUTER_MODEL', 'claude-3-haiku')
+                model = model or os.getenv('OPENROUTER_MODEL', 'anthropic/claude-3-haiku')
                 
                 return client.generate_summary(prompt, model=model)
                 
