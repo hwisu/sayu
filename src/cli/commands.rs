@@ -63,6 +63,10 @@ pub enum Commands {
         /// Show verbose output with full details
         #[arg(short = 'v', long)]
         verbose: bool,
+        
+        /// Collect fresh events before listing
+        #[arg(long)]
+        collect: bool,
     },
 }
 

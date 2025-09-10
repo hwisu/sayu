@@ -89,12 +89,16 @@ impl CursorCollector {
         let conn = Connection::open(db_path)?;
         let mut events = Vec::new();
         
-        // Query for cursor conversation bubbles
+        // Query for cursor conversation data
         let query = r#"
             SELECT key, value
             FROM ItemTable
             WHERE key LIKE 'cursorDiskKV.composer.bubble.%'
                OR key LIKE 'cursorDiskKV.agentic.bubble.%'
+               OR key LIKE 'workbench.panel.composerChatViewPane.%'
+               OR key LIKE 'workbench.panel.aichat.%'
+               OR key LIKE '%chat%'
+               OR key LIKE '%conversation%'
         "#;
         
         let mut stmt = conn.prepare(query)?;
@@ -191,16 +195,32 @@ impl Collector for CursorCollector {
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
         
+        if self.debug {
+            println!("Cursor: Found {} database(s) to check", db_paths.len());
+            for (i, path) in db_paths.iter().enumerate() {
+                println!("Cursor: DB {}: {:?}", i + 1, path);
+            }
+        }
+        
         let mut all_events = Vec::new();
         
         for db_path in db_paths {
             match self.parse_cursor_database(&db_path, repo_name, since_ts) {
-                Ok(events) => all_events.extend(events),
+                Ok(events) => {
+                    if self.debug && !events.is_empty() {
+                        println!("Cursor: Found {} events in {:?}", events.len(), db_path.file_name());
+                    }
+                    all_events.extend(events);
+                },
                 Err(e) if self.debug => {
                     println!("Error parsing Cursor database {:?}: {}", db_path, e);
                 }
                 _ => {}
             }
+        }
+        
+        if self.debug {
+            println!("Cursor: Total {} events collected", all_events.len());
         }
         
         // Sort by timestamp
