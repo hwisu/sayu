@@ -23,6 +23,14 @@ class LLMSummaryGenerator:
         prompt = LLMSummaryGenerator._build_prompt(llm_events, staged_files, diff_stats)
         response = LLMFactory.call_llm(prompt)
         
+        # Handle None or invalid response
+        if response is None:
+            return LLMSummaryGenerator._format_raw_response("No response from LLM")
+        
+        # Ensure response is a string
+        if not isinstance(response, str):
+            return LLMSummaryGenerator._format_raw_response(str(response))
+        
         try:
             # Try to extract JSON from markdown code blocks
             json_content = LLMSummaryGenerator._extract_json_from_response(response)
@@ -46,6 +54,14 @@ class LLMSummaryGenerator:
             conversations_text, staged_files, diff_stats
         )
         response = LLMFactory.call_llm(simple_prompt)
+        
+        # Handle None or invalid response
+        if response is None:
+            return LLMSummaryGenerator._format_raw_response("No response from LLM")
+        
+        # Ensure response is a string
+        if not isinstance(response, str):
+            return LLMSummaryGenerator._format_raw_response(str(response))
         
         try:
             # Try to extract JSON from markdown code blocks
@@ -147,6 +163,10 @@ class LLMSummaryGenerator:
         lines = []
         lines.append('---')
         lines.append('思惟---')
+        
+        # Ensure text is a string
+        if not isinstance(text, str):
+            text = str(text) if text is not None else "No response"
         
         clean_text = re.sub(r'[\n\r]+', ' ', text).strip()
         if len(clean_text) > MAX_RAW_RESPONSE_LENGTH:
