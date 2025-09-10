@@ -155,7 +155,7 @@ impl Storage {
     }
     
     pub fn get_all_recent_events(&self, limit: usize, source_filter: Option<&str>) -> Result<Vec<Event>> {
-        let query = if let Some(source) = source_filter {
+        let query = if let Some(_source) = source_filter {
             "SELECT id, source, kind, repo, text, actor, meta, branch
              FROM events
              WHERE source = ?1
