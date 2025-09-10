@@ -53,7 +53,7 @@ class LLMFactory:
     
     @staticmethod
     def call_llm(prompt: str, provider: Optional[str] = None, model: Optional[str] = None) -> Optional[str]:
-        """Unified interface for calling any LLM provider"""
+        """Unified interface for calling any LLM provider with fallback"""
         
         # Load .env file
         LLMFactory._load_env()
@@ -79,6 +79,23 @@ class LLMFactory:
                 raise ValueError(f"Unsupported LLM provider: {provider}")
                 
         except Exception as e:
+            import httpx
+            # If Gemini times out, try OpenRouter as fallback
+            if isinstance(e, httpx.ReadTimeout) and provider == LLMProvider.GEMINI:
+                openrouter_key = os.getenv('SAYU_OPENROUTER_API_KEY')
+                if openrouter_key:
+                    print(f"[Sayu] Gemini timeout, falling back to OpenRouter...")
+                    try:
+                        from infra.api.llm_openrouter import OpenRouterClient
+                        client = OpenRouterClient()
+                        model = model or os.getenv('SAYU_OPENROUTER_MODEL', 'anthropic/claude-3-haiku')
+                        return client.generate_summary(prompt, model=model)
+                    except Exception as fallback_error:
+                        print(f"[Sayu] OpenRouter fallback failed: {type(fallback_error).__name__}: {fallback_error}")
+                        if os.getenv('SAYU_DEBUG'):
+                            import traceback
+                            traceback.print_exc()
+            
             print(f"[Sayu] LLM call failed: {type(e).__name__}: {e}")
             if os.getenv('SAYU_DEBUG'):
                 import traceback
