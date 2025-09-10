@@ -161,6 +161,56 @@ impl Storage {
         
         Ok(deleted)
     }
+    
+    pub fn get_all_recent_events(&self, limit: usize, source_filter: Option<&str>) -> Result<Vec<Event>> {
+        let query = if let Some(source) = source_filter {
+            "SELECT id, source, kind, repo, text, ts, actor, file, cwd, meta
+             FROM events
+             WHERE source = ?1
+             ORDER BY ts DESC
+             LIMIT ?2"
+        } else {
+            "SELECT id, source, kind, repo, text, ts, actor, file, cwd, meta
+             FROM events
+             ORDER BY ts DESC
+             LIMIT ?1"
+        };
+        
+        let mut stmt = self.conn.prepare(query)?;
+        
+        let events = if let Some(source) = source_filter {
+            stmt.query_map(params![source.to_lowercase(), limit], Self::row_to_event)?
+        } else {
+            stmt.query_map(params![limit], Self::row_to_event)?
+        }
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(events)
+    }
+    
+    fn row_to_event(row: &rusqlite::Row) -> rusqlite::Result<Event> {
+        let source_str: String = row.get(1)?;
+        let kind_str: String = row.get(2)?;
+        let actor_str: Option<String> = row.get(6)?;
+        let meta_json: String = row.get(9)?;
+        
+        Ok(Event {
+            id: row.get(0)?,
+            source: serde_json::from_value(serde_json::Value::String(source_str))
+                .unwrap_or(crate::domain::EventSource::Git),
+            kind: serde_json::from_value(serde_json::Value::String(kind_str))
+                .unwrap_or(crate::domain::EventKind::Commit),
+            repo: row.get(3)?,
+            text: row.get(4)?,
+            ts: row.get(5)?,
+            actor: actor_str.and_then(|s| 
+                serde_json::from_value(serde_json::Value::String(s)).ok()
+            ),
+            file: row.get(7)?,
+            cwd: row.get(8)?,
+            meta: serde_json::from_str(&meta_json).unwrap_or_default(),
+        })
+    }
 }
 
 // Simple cache implementation

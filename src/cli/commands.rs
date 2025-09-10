@@ -49,6 +49,21 @@ pub enum Commands {
     
     /// Uninstall Sayu from repository
     Uninstall,
+    
+    /// List recent work context in reverse chronological order
+    List {
+        /// Number of events to show
+        #[arg(short = 'n', default_value = "20")]
+        count: usize,
+        
+        /// Filter by source (claude, cursor, cli, git)
+        #[arg(short = 's', long)]
+        source: Option<String>,
+        
+        /// Show verbose output with full details
+        #[arg(short = 'v', long)]
+        verbose: bool,
+    },
 }
 
 #[derive(Clone, clap::ValueEnum)]
@@ -66,6 +81,7 @@ pub async fn run() -> Result<()> {
         Commands::Health => health_command().await,
         Commands::Show { count } => show_command(count).await,
         Commands::Uninstall => uninstall_command().await,
+        Commands::List { count, source, verbose } => list_command(count, source, verbose).await,
     }
 }
 
@@ -263,6 +279,99 @@ async fn show_command(count: usize) -> Result<()> {
             }
             println!("Text: {}", event.text);
         }
+    }
+    
+    Ok(())
+}
+
+async fn list_command(count: usize, source: Option<String>, verbose: bool) -> Result<()> {
+    let repo_root = get_git_repo_root()?;
+    let storage = Storage::new(&repo_root)?;
+    
+    let events = storage.get_all_recent_events(count, source.as_deref())?;
+    
+    if events.is_empty() {
+        println!("No events found");
+        return Ok(());
+    }
+    
+    // Header
+    println!("{}", "📋 Recent Work Context".bold());
+    println!("{}", "─".repeat(120));
+    
+    if verbose {
+        // Verbose output with full details
+        for event in events {
+            let time = chrono::DateTime::from_timestamp_millis(event.ts)
+                .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+                .unwrap_or_else(|| "Unknown".to_string());
+            
+            println!("{}", "─".repeat(100));
+            println!("{:<12} {}", "Time:".bold(), time);
+            println!("{:<12} {:?}", "Source:".bold(), event.source);
+            println!("{:<12} {:?}", "Type:".bold(), event.kind);
+            
+            if let Some(actor) = &event.actor {
+                println!("{:<12} {:?}", "Actor:".bold(), actor);
+            }
+            
+            if let Some(file) = &event.file {
+                println!("{:<12} {}", "File:".bold(), file);
+            }
+            
+            if let Some(cwd) = &event.cwd {
+                println!("{:<12} {}", "Directory:".bold(), cwd);
+            }
+            
+            // Format text content
+            println!("{:<12}", "Content:".bold());
+            for line in event.text.lines().take(10) {
+                println!("  {}", line);
+            }
+            if event.text.lines().count() > 10 {
+                println!("  ... ({} more lines)", event.text.lines().count() - 10);
+            }
+        }
+        println!("{}", "─".repeat(100));
+    } else {
+        // Table format for concise output
+        println!("{:<20} {:<12} {:<12} {}",
+                 "Time".bold(),
+                 "Source".bold(),
+                 "Type".bold(),
+                 "Content".bold());
+        println!("{}", "─".repeat(100));
+        
+        for event in &events {
+            let time = chrono::DateTime::from_timestamp_millis(event.ts)
+                .map(|dt| dt.format("%m-%d %H:%M").to_string())
+                .unwrap_or_else(|| "Unknown".to_string());
+            
+            let source = match &event.source {
+                EventSource::Claude => "claude".cyan(),
+                EventSource::Cursor => "cursor".magenta(),
+                EventSource::Cli => "cli".yellow(),
+                EventSource::Git => "git".green(),
+            };
+            
+            let kind = format!("{:?}", event.kind).to_lowercase();
+            
+            // Truncate text for summary
+            let summary = if event.text.len() > 55 {
+                format!("{}...", &event.text[..55])
+            } else {
+                event.text.clone()
+            }
+            .replace('\n', " ");
+            
+            println!("{:<20} {:<12} {:<12} {}",
+                     time,
+                     source,
+                     kind,
+                     summary);
+        }
+        println!("{}", "─".repeat(100));
+        println!("Showing {} most recent events. Use -v for detailed view.", events.len());
     }
     
     Ok(())
