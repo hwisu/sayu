@@ -1,6 +1,6 @@
 use anyhow::Result;
-use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection, OptionalExtension};
+use chrono::Utc;
+use rusqlite::{params, Connection};
 use serde_json;
 use std::path::{Path, PathBuf};
 use crate::domain::Event;
@@ -68,7 +68,7 @@ impl Storage {
                 event.repo,
                 event.text,
                 event.ts,
-                event.actor.as_ref().map(|a| format!("{:?}", a).to_lowercase()),
+                event.actor.as_ref().map(|a| format!("{a:?}").to_lowercase()),
                 event.file,
                 event.cwd,
                 meta_json,
@@ -177,7 +177,7 @@ impl Cache {
     }
     
     pub fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
-        let file_path = self.cache_dir.join(format!("{}.cache", key));
+        let file_path = self.cache_dir.join(format!("{key}.cache"));
         
         if !file_path.exists() {
             return Ok(None);
@@ -197,17 +197,15 @@ impl Cache {
     }
     
     pub fn set(&self, key: &str, value: &[u8]) -> Result<()> {
-        let file_path = self.cache_dir.join(format!("{}.cache", key));
+        let file_path = self.cache_dir.join(format!("{key}.cache"));
         std::fs::write(&file_path, value)?;
         Ok(())
     }
     
     pub fn clear(&self) -> Result<()> {
-        for entry in std::fs::read_dir(&self.cache_dir)? {
-            if let Ok(entry) = entry {
-                if entry.path().extension().and_then(|s| s.to_str()) == Some("cache") {
-                    let _ = std::fs::remove_file(entry.path());
-                }
+        for entry in std::fs::read_dir(&self.cache_dir)?.flatten() {
+            if entry.path().extension().and_then(|s| s.to_str()) == Some("cache") {
+                let _ = std::fs::remove_file(entry.path());
             }
         }
         Ok(())

@@ -58,7 +58,7 @@ impl Default for Connectors {
 }
 
 pub struct ConfigManager {
-    repo_root: PathBuf,
+    _repo_root: PathBuf,
     config: UserConfig,
 }
 
@@ -70,7 +70,7 @@ impl ConfigManager {
         let config = Self::load_config(&repo_root)?;
         
         Ok(Self {
-            repo_root,
+            _repo_root: repo_root,
             config,
         })
     }
@@ -94,7 +94,7 @@ impl ConfigManager {
 
     pub fn get(&self) -> &UserConfig {
         // Check environment variable override for language only
-        if let Ok(lang) = std::env::var("SAYU_LANG") {
+        if let Ok(_lang) = std::env::var("SAYU_LANG") {
             // For simplicity, returning the stored config
             // In a full implementation, we'd create a new config with the override
             &self.config

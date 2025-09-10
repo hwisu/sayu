@@ -67,7 +67,7 @@ pub async fn run() -> Result<()> {
     }
 }
 
-async fn init_command(no_interactive: bool) -> Result<()> {
+async fn init_command(_no_interactive: bool) -> Result<()> {
     println!("{}", "🔧 Initializing Sayu...".bold());
     
     let repo_root = get_git_repo_root()?;
@@ -77,7 +77,7 @@ async fn init_command(no_interactive: bool) -> Result<()> {
     install_git_hooks(&repo_root)?;
     
     // Initialize storage
-    let storage = Storage::new(&repo_root)?;
+    let _storage = Storage::new(&repo_root)?;
     println!("✓ Database initialized");
     
     // Create default config
@@ -213,7 +213,7 @@ async fn show_command(count: usize) -> Result<()> {
                 .unwrap_or_else(|| "Unknown".to_string()));
             println!("Source: {:?}, Kind: {:?}", event.source, event.kind);
             if let Some(actor) = &event.actor {
-                println!("Actor: {:?}", actor);
+                println!("Actor: {actor:?}");
             }
             println!("Text: {}", event.text);
         }
@@ -233,7 +233,7 @@ async fn uninstall_command() -> Result<()> {
         let hook_path = hooks_dir.join(hook_name);
         if hook_path.exists() {
             std::fs::remove_file(&hook_path)?;
-            println!("✓ Removed {} hook", hook_name);
+            println!("✓ Removed {hook_name} hook");
         }
     }
     
@@ -248,7 +248,7 @@ async fn uninstall_command() -> Result<()> {
 
 fn get_git_repo_root() -> Result<PathBuf> {
     let output = Command::new("git")
-        .args(&["rev-parse", "--show-toplevel"])
+        .args(["rev-parse", "--show-toplevel"])
         .output()
         .context("Failed to execute git command")?;
     
@@ -299,7 +299,7 @@ fn install_git_hooks(repo_root: &Path) -> Result<()> {
     Ok(())
 }
 
-fn install_cli_hook(repo_root: &Path) -> Result<()> {
+fn install_cli_hook(_repo_root: &Path) -> Result<()> {
     // Install zsh preexec hook
     let home = dirs::home_dir().context("Could not find home directory")?;
     let zshrc = home.join(".zshrc");
@@ -316,16 +316,14 @@ fn install_cli_hook(repo_root: &Path) -> Result<()> {
     }
     
     // Append hook
-    let hook_content = format!(
-        "\n# Sayu CLI tracking\nsayu_preexec() {{\n  sayu track-cli \"$1\" 2>/dev/null || true\n}}\npreexec_functions+=(sayu_preexec)\n"
-    );
+    let hook_content = "\n# Sayu CLI tracking\nsayu_preexec() {\n  sayu track-cli \"$1\" 2>/dev/null || true\n}\npreexec_functions+=(sayu_preexec)\n".to_string();
     
-    std::fs::write(&zshrc, format!("{}{}", content, hook_content))?;
+    std::fs::write(&zshrc, format!("{content}{hook_content}"))?;
     
     Ok(())
 }
 
-async fn handle_commit_msg(repo_root: &Path, msg_file: &str) -> Result<()> {
+async fn handle_commit_msg(repo_root: &Path, _msg_file: &str) -> Result<()> {
     // This would integrate with the LLM to add context to commit messages
     // For now, just a placeholder
     
@@ -348,7 +346,7 @@ async fn handle_post_commit(repo_root: &Path) -> Result<()> {
     
     // Get latest commit info
     let output = Command::new("git")
-        .args(&["log", "-1", "--pretty=format:%H|%s|%an"])
+        .args(["log", "-1", "--pretty=format:%H|%s|%an"])
         .current_dir(repo_root)
         .output()?;
     
