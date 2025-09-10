@@ -20,10 +20,9 @@ sayu init
 # Set API key (choose one)
 export SAYU_GEMINI_API_KEY=your_key
 
-# Or use OpenRouter
+# Or use OpenRouter (recommended for better model access)
 export SAYU_OPENROUTER_API_KEY=your_key
-export SAYU_LLM_PROVIDER=openrouter
-export SAYU_OPENROUTER_MODEL=anthropic/claude-3-haiku
+export SAYU_LLM_MODEL=anthropic/claude-3.5-haiku  # Optional: specify model
 
 # Commit normally
 git commit -m "Fix bug"
@@ -63,9 +62,22 @@ The following settings are now hardcoded defaults:
 
 Environment variables:
 ```bash
-SAYU_LANG=en          # Override language
-SAYU_DEBUG=true       # Debug mode
+SAYU_LANG=en                    # Override language
+SAYU_DEBUG=true                 # Debug mode
+
+# LLM Configuration
+SAYU_OPENROUTER_API_KEY=key     # OpenRouter API key (recommended)
+SAYU_GEMINI_API_KEY=key         # Google Gemini API key
+SAYU_LLM_MODEL=model_name       # Model to use (default: anthropic/claude-3.5-haiku)
+SAYU_LLM_TEMPERATURE=0.7        # Creativity level (0.0-1.0)
+SAYU_LLM_MAX_TOKENS=1000        # Maximum tokens
 ```
+
+Popular OpenRouter models:
+- `anthropic/claude-3.5-haiku` - Fast and cost-effective
+- `anthropic/claude-3.5-sonnet` - Balanced performance
+- `openai/gpt-4o-mini` - Fast and cheap
+- `meta-llama/llama-3.1-8b-instruct` - Open source
 
 ## Building
 

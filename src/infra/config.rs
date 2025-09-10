@@ -90,6 +90,19 @@ impl ConfigManager {
 # 커밋에 '왜'를 남기는 개인 로컬 블랙박스
 
 language: ko  # 언어 설정 (ko, en)
+
+# LLM 설정 (환경변수로도 설정 가능)
+# SAYU_OPENROUTER_API_KEY: OpenRouter API 키 (권장)
+# SAYU_GEMINI_API_KEY: Google Gemini API 키
+# SAYU_LLM_MODEL: 사용할 모델 (기본값: anthropic/claude-3.5-haiku)
+# SAYU_LLM_TEMPERATURE: 창의성 수준 (0.0-1.0, 기본값: 0.7)
+# SAYU_LLM_MAX_TOKENS: 최대 토큰 수 (기본값: 1000)
+
+# 인기 있는 OpenRouter 모델들:
+# - anthropic/claude-3.5-haiku (빠르고 비용 효율적)
+# - anthropic/claude-3.5-sonnet (균형잡힌 성능)
+# - openai/gpt-4o-mini (빠르고 저렴)
+# - meta-llama/llama-3.1-8b-instruct (오픈소스)
 "#;
 
         std::fs::write(&config_path, default_content)?;
