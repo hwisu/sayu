@@ -160,10 +160,10 @@ sayu_precmd() {{
     local ts_ms=$((end_time * 1000))
     
     # JSON escape handling (safely)
-    local cmd_safe=${{SAYU_CMD//"/\\"}}
-    cmd_safe=${{cmd_safe//\\/\\\\}}
-    local cwd_safe=${{cwd//"/\\"}}
-    cwd_safe=${{cwd_safe//\\/\\\\}}
+    local cmd_safe=${{SAYU_CMD//\\\"/\\\\\\\"}}
+    cmd_safe=${{cmd_safe//\\\\/\\\\\\\\}}
+    local cwd_safe=${{cwd//\\\"/\\\\\\\"}}
+    cwd_safe=${{cwd_safe//\\\\/\\\\\\\\}}
     
     # Create log entry
     local log_entry="{{\\"ts\\":$ts_ms,\\"cmd\\":\\"$cmd_safe\\",\\"exitCode\\":$exit_code,\\"duration\\":$duration,\\"cwd\\":\\"$cwd_safe\\"}}"
