@@ -362,6 +362,15 @@ async fn handle_commit_msg(repo_root: &Path, msg_file: &str) -> Result<()> {
     // Get last commit timestamp to filter events
     let last_commit_ts = get_last_commit_timestamp(repo_root).unwrap_or(0);
     
+    if std::env::var("SAYU_DEBUG").is_ok() {
+        println!("Last commit timestamp: {} ({})", 
+            last_commit_ts,
+            chrono::DateTime::from_timestamp_millis(last_commit_ts)
+                .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+                .unwrap_or_else(|| "Unknown".to_string())
+        );
+    }
+    
     // Collect events from all sources in parallel
     let claude_collector = ClaudeCollector::new();
     let cursor_collector = CursorCollector::new();
@@ -393,7 +402,14 @@ async fn handle_commit_msg(repo_root: &Path, msg_file: &str) -> Result<()> {
     
     // If no events collected, skip
     if all_events.is_empty() {
+        if std::env::var("SAYU_DEBUG").is_ok() {
+            println!("No events collected since last commit");
+        }
         return Ok(());
+    }
+    
+    if std::env::var("SAYU_DEBUG").is_ok() {
+        println!("Collected {} events for commit summary", all_events.len());
     }
     
     // Generate summary using LLM

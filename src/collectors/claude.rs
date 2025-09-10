@@ -15,13 +15,16 @@ pub struct ClaudeCollector {
 struct ClaudeMessage {
     #[serde(default)]
     timestamp: Option<serde_json::Value>,  // Can be i64 or string
+    #[serde(rename = "type")]
+    msg_type: Option<String>,
+    uuid: Option<String>,
+    message: Option<InnerMessage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct InnerMessage {
     role: Option<String>,
-    text: Option<String>,
-    content: Option<String>,
-    #[serde(rename = "conversationID")]
-    conversation_id: Option<String>,
-    #[serde(rename = "messageID")]
-    message_id: Option<String>,
+    content: Option<serde_json::Value>,  // Can be string or array
 }
 
 impl ClaudeCollector {
@@ -95,6 +98,11 @@ impl ClaudeCollector {
             
             match serde_json::from_str::<ClaudeMessage>(line) {
                 Ok(msg) => {
+                    // Skip non-user/assistant messages
+                    if msg.msg_type.as_deref() != Some("user") && msg.msg_type.as_deref() != Some("assistant") {
+                        continue;
+                    }
+                    
                     // Extract timestamp - handle both i64 and ISO string formats
                     let timestamp = match msg.timestamp {
                         Some(serde_json::Value::Number(n)) => {
@@ -114,8 +122,35 @@ impl ClaudeCollector {
                         _ => 0,
                     };
                     
-                    // Extract text (prefer text over content)
-                    let text = msg.text.or(msg.content).unwrap_or_default();
+                    // Extract inner message
+                    let inner = match msg.message {
+                        Some(inner) => inner,
+                        None => continue,
+                    };
+                    
+                    // Extract text from content (can be string or array)
+                    let text = match inner.content {
+                        Some(serde_json::Value::String(s)) => s,
+                        Some(serde_json::Value::Array(arr)) => {
+                            // Extract text from array of content objects
+                            let mut combined_text = String::new();
+                            for item in arr {
+                                if let Some(content_type) = item.get("type").and_then(|v| v.as_str()) {
+                                    if content_type == "text" {
+                                        if let Some(text) = item.get("text").and_then(|v| v.as_str()) {
+                                            if !combined_text.is_empty() {
+                                                combined_text.push_str("\n");
+                                            }
+                                            combined_text.push_str(text);
+                                        }
+                                    }
+                                }
+                            }
+                            combined_text
+                        }
+                        _ => String::new(),
+                    };
+                    
                     if text.is_empty() {
                         continue;
                     }
@@ -129,10 +164,14 @@ impl ClaudeCollector {
                     }
                     
                     // Determine actor based on role
-                    let actor = match msg.role.as_deref() {
+                    let actor = match inner.role.as_deref() {
                         Some("user") | Some("human") => Actor::User,
                         Some("assistant") => Actor::Assistant,
-                        _ => Actor::User,
+                        _ => match msg.msg_type.as_deref() {
+                            Some("user") => Actor::User,
+                            Some("assistant") => Actor::Assistant,
+                            _ => Actor::User,
+                        }
                     };
                     
                     // Create event
@@ -147,11 +186,8 @@ impl ClaudeCollector {
                     event = event.with_actor(actor);
                     
                     // Add metadata
-                    if let Some(conv_id) = msg.conversation_id {
-                        event = event.with_meta("conversation_id".to_string(), serde_json::Value::String(conv_id));
-                    }
-                    if let Some(msg_id) = msg.message_id {
-                        event = event.with_meta("message_id".to_string(), serde_json::Value::String(msg_id));
+                    if let Some(uuid) = msg.uuid {
+                        event = event.with_meta("message_id".to_string(), serde_json::Value::String(uuid));
                     }
                     
                     events.push(event);
@@ -165,7 +201,16 @@ impl ClaudeCollector {
         
         // Second pass: filter by timestamp
         if let Some(since) = since_ts {
-            events.retain(|e| e.ts > since);
+            if self.debug {
+                let before = events.len();
+                events.retain(|e| e.ts > since);
+                let after = events.len();
+                if before != after {
+                    println!("Claude: Filtered {} -> {} events (since {})", before, after, since);
+                }
+            } else {
+                events.retain(|e| e.ts > since);
+            }
         }
         
         Ok(events)
@@ -184,12 +229,21 @@ impl Collector for ClaudeCollector {
         let mut all_events = Vec::new();
         for path in conversation_paths {
             match self.parse_conversation_file(&path, since_ts) {
-                Ok(events) => all_events.extend(events),
+                Ok(events) => {
+                    if self.debug && !events.is_empty() {
+                        println!("Claude: Found {} events in {:?}", events.len(), path.file_name());
+                    }
+                    all_events.extend(events);
+                },
                 Err(e) if self.debug => {
                     println!("Error parsing Claude conversation file {:?}: {}", path, e);
                 }
                 _ => {}
             }
+        }
+        
+        if self.debug {
+            println!("Claude: Total {} events collected", all_events.len());
         }
         
         // Sort by timestamp
