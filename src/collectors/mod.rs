@@ -1,6 +1,6 @@
 pub mod claude;
 pub mod cursor;
-pub mod cli;
+pub mod shell;
 
 use anyhow::Result;
 use crate::domain::{Event, EventSource};
@@ -21,4 +21,4 @@ pub trait Collector: Send + Sync {
 
 pub use claude::ClaudeCollector;
 pub use cursor::CursorCollector;
-pub use cli::CliCollector;
+pub use shell::ShellCollector;

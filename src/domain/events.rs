@@ -7,7 +7,7 @@ use std::collections::HashMap;
 pub enum EventSource {
     Claude,
     Cursor,
-    Cli,
+    Shell,
     Git,
 }
 

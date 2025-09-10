@@ -6,7 +6,7 @@ use std::process::Command;
 
 use crate::infra::{ConfigManager, Storage};
 use crate::domain::{Event, EventKind, EventSource};
-use crate::collectors::{Collector, ClaudeCollector, CursorCollector, CliCollector};
+use crate::collectors::{Collector, ClaudeCollector, CursorCollector, ShellCollector};
 use crate::llm::EventSummarizer;
 
 #[derive(Parser)]
@@ -85,7 +85,7 @@ pub async fn run() -> Result<()> {
         Commands::Health => health_command().await,
         Commands::Show { count } => show_command(count).await,
         Commands::Uninstall => uninstall_command().await,
-        Commands::List { count, source, verbose } => list_command(count, source, verbose).await,
+        Commands::List { count, source, verbose, collect } => list_command(count, source, verbose, collect).await,
     }
 }
 
@@ -106,19 +106,20 @@ async fn init_command(_no_interactive: bool) -> Result<()> {
     ConfigManager::create_default(&repo_root)?;
     println!("✓ Configuration created");
     
-    // Install CLI hook using the CliCollector
-    match CliCollector::new() {
-        Ok(cli_collector) => {
-            if let Err(e) = cli_collector.install_hook() {
-                println!("{} CLI hook installation failed: {}", "⚠️".yellow(), e);
+    // Install shell hook using the ShellCollector
+    match ShellCollector::new() {
+        Ok(shell_collector) => {
+            if let Err(e) = shell_collector.install_hook() {
+                println!("{} Shell hook installation failed: {}", "⚠️".yellow(), e);
             } else {
-                println!("✓ zsh CLI tracking hook installed");
-                println!("{} Will be active in new terminal sessions (or run: source ~/.zshrc)", 
-                         "⚠️".yellow());
+                println!("✓ Shell tracking hooks installed (bash & zsh)");
+                println!("{} Will be active in new terminal sessions", "⚠️".yellow());
+                println!("  For zsh: source ~/.zshrc");
+                println!("  For bash: source ~/.bashrc");
             }
         }
         Err(e) => {
-            println!("{} Failed to initialize CLI collector: {}", "⚠️".yellow(), e);
+            println!("{} Failed to initialize shell collector: {}", "⚠️".yellow(), e);
         }
     }
     
@@ -211,14 +212,14 @@ async fn health_command() -> Result<()> {
     
     let claude_collector = ClaudeCollector::new();
     let cursor_collector = CursorCollector::new();
-    let cli_collector_result = CliCollector::new();
+    let shell_collector_result = ShellCollector::new();
     
     // Run all health checks in parallel
     let (claude_health, cursor_health, cli_health) = tokio::join!(
         claude_collector.health_check(),
         cursor_collector.health_check(),
         async {
-            match cli_collector_result {
+            match shell_collector_result {
                 Ok(collector) => collector.health_check().await,
                 Err(_) => Ok(false),
             }
@@ -291,9 +292,75 @@ async fn show_command(count: usize) -> Result<()> {
     Ok(())
 }
 
-async fn list_command(count: usize, source: Option<String>, verbose: bool) -> Result<()> {
+async fn list_command(count: usize, source: Option<String>, verbose: bool, collect: bool) -> Result<()> {
     let repo_root = get_git_repo_root()?;
     let storage = Storage::new(&repo_root)?;
+    
+    // Collect fresh events if requested
+    if collect {
+        println!("🔄 Collecting fresh events...");
+        
+        let claude_collector = ClaudeCollector::new();
+        let cursor_collector = CursorCollector::new();
+        let shell_collector_result = ShellCollector::new();
+        
+        // Run all collectors in parallel
+        let (claude_events, cursor_events, shell_events) = tokio::join!(
+            claude_collector.collect(&repo_root, None),
+            cursor_collector.collect(&repo_root, None),
+            async {
+                match shell_collector_result {
+                    Ok(collector) => collector.collect(&repo_root, None).await,
+                    Err(_) => Ok(Vec::new()),
+                }
+            }
+        );
+        
+        // Store collected events
+        let mut total_stored = 0;
+        
+        if let Ok(events) = claude_events {
+            for event in events {
+                if let Err(e) = storage.save_event(&event) {
+                    if std::env::var("SAYU_DEBUG").is_ok() {
+                        println!("Failed to save Claude event: {}", e);
+                    }
+                } else {
+                    total_stored += 1;
+                }
+            }
+        }
+        
+        if let Ok(events) = cursor_events {
+            for event in events {
+                if let Err(e) = storage.save_event(&event) {
+                    if std::env::var("SAYU_DEBUG").is_ok() {
+                        println!("Failed to save Cursor event: {}", e);
+                    }
+                } else {
+                    total_stored += 1;
+                }
+            }
+        }
+        
+        if let Ok(events) = shell_events {
+            for event in events {
+                if let Err(e) = storage.save_event(&event) {
+                    if std::env::var("SAYU_DEBUG").is_ok() {
+                        println!("Failed to save CLI event: {}", e);
+                    }
+                } else {
+                    total_stored += 1;
+                }
+            }
+        }
+        
+        if total_stored > 0 {
+            println!("✅ Collected {} new events", total_stored);
+        } else {
+            println!("ℹ️  No new events found");
+        }
+    }
     
     let events = storage.get_all_recent_events(count, source.as_deref())?;
     
@@ -358,15 +425,16 @@ async fn list_command(count: usize, source: Option<String>, verbose: bool) -> Re
             let source = match &event.source {
                 EventSource::Claude => "claude".cyan(),
                 EventSource::Cursor => "cursor".magenta(),
-                EventSource::Cli => "cli".yellow(),
+                EventSource::Shell => "shell".yellow(),
                 EventSource::Git => "git".green(),
             };
             
             let kind = format!("{:?}", event.kind).to_lowercase();
             
-            // Truncate text for summary
-            let summary = if event.text.len() > 55 {
-                format!("{}...", &event.text[..55])
+            // Truncate text for summary (char-aware for UTF-8)
+            let summary = if event.text.chars().count() > 55 {
+                let truncated: String = event.text.chars().take(55).collect();
+                format!("{}...", truncated)
             } else {
                 event.text.clone()
             }
@@ -491,14 +559,14 @@ async fn handle_commit_msg(repo_root: &Path, msg_file: &str) -> Result<()> {
     // Collect events from all sources in parallel
     let claude_collector = ClaudeCollector::new();
     let cursor_collector = CursorCollector::new();
-    let cli_collector_result = CliCollector::new();
+    let shell_collector_result = ShellCollector::new();
     
     // Run all collectors in parallel
-    let (claude_events, cursor_events, cli_events) = tokio::join!(
+    let (claude_events, cursor_events, shell_events) = tokio::join!(
         claude_collector.collect(repo_root, Some(last_commit_ts)),
         cursor_collector.collect(repo_root, Some(last_commit_ts)),
         async {
-            match cli_collector_result {
+            match shell_collector_result {
                 Ok(collector) => collector.collect(repo_root, Some(last_commit_ts)).await,
                 Err(_) => Ok(Vec::new()),
             }
@@ -513,7 +581,7 @@ async fn handle_commit_msg(repo_root: &Path, msg_file: &str) -> Result<()> {
     if let Ok(events) = cursor_events {
         all_events.extend(events);
     }
-    if let Ok(events) = cli_events {
+    if let Ok(events) = shell_events {
         all_events.extend(events);
     }
     
@@ -687,13 +755,13 @@ async fn handle_post_commit(repo_root: &Path) -> Result<()> {
         // Run collectors to gather context
         let claude_collector = ClaudeCollector::new();
         let cursor_collector = CursorCollector::new();
-        let cli_collector = CliCollector::new()?;
+        let shell_collector = ShellCollector::new()?;
         
         // Collect in parallel
-        let (claude_events, cursor_events, cli_events) = tokio::join!(
+        let (claude_events, cursor_events, shell_events) = tokio::join!(
             claude_collector.collect(repo_root, since_ts),
             cursor_collector.collect(repo_root, since_ts),
-            cli_collector.collect(repo_root, since_ts)
+            shell_collector.collect(repo_root, since_ts)
         );
         
         // Store collected events
@@ -713,7 +781,7 @@ async fn handle_post_commit(repo_root: &Path) -> Result<()> {
             }
         }
         
-        if let Ok(events) = cli_events {
+        if let Ok(events) = shell_events {
             for event in events {
                 storage.save_event(&event)?;
                 total_events += 1;
