@@ -16,7 +16,7 @@ MAX_RAW_RESPONSE_LENGTH: Final[int] = 10000  # Maximum raw response length
 
 # LLM API constants
 LLM_TEMPERATURE: Final[float] = 0.3  # Temperature for LLM generation
-LLM_MAX_OUTPUT_TOKENS: Final[int] = 1024  # Maximum output tokens
+LLM_MAX_OUTPUT_TOKENS: Final[int] = 8096  # Maximum output tokens (increased for thinking models)
 
 # Summary formatting constants
 SUMMARY_SEPARATOR: Final[str] = '---思惟---\n\n'
