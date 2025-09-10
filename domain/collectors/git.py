@@ -141,29 +141,8 @@ class GitCollector:
     
     def redact(self, event: Event, cfg: Any) -> Event:
         """Redact sensitive information from git event"""
-        if not cfg.privacy.maskSecrets:
-            return event
-        
-        # Apply privacy masks
-        text = event.text
-        for pattern in cfg.privacy.masks:
-            import re
-            text = re.sub(pattern, '[REDACTED]', text)
-        
-        return Event(
-            id=event.id,
-            ts=event.ts,
-            source=event.source,
-            kind=event.kind,
-            repo=event.repo,
-            cwd=event.cwd,
-            file=event.file,
-            range=event.range,
-            actor=event.actor,
-            text=text,
-            url=event.url,
-            meta=event.meta
-        )
+        # No privacy masking in simplified version
+        return event
     
     def get_current_commit_context(self) -> Dict[str, Any]:
         """Get current commit context (staged files and diff)"""

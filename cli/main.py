@@ -39,7 +39,7 @@ def init(no_interactive):
         
         # Initialize database
         StoreManager.check_connection()
-        print("Database initialized")
+        print("Initialization complete")
         
         # Install CLI hook
         try:
@@ -112,12 +112,12 @@ def health():
         else:
             print("❌ Git hooks not installed")
         
-        # Check database
+        # Check event store
         try:
             StoreManager.check_connection()
-            print("✅ Database connected")
+            print("✅ Event store ready")
         except:
-            print("❌ Database connection failed")
+            print("❌ Event store initialization failed")
         
         # Check collectors
         try:

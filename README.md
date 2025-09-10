@@ -11,9 +11,9 @@ Sayu analyzes your conversations with AI coding assistants (Cursor, Claude) and 
 ## Key Features
 
 - **AI conversation collection**: Automatically collects conversations from Cursor and Claude Desktop
-- **Smart filtering**: Reduces noise by 93% to focus on relevant content
+- **Smart filtering**: Focuses only on relevant conversations from your repository
 - **Fast processing**: Generates context in 2-3 seconds during commit
-- **Privacy-first**: All data stored locally
+- **Privacy-first**: All data processed locally, no persistent storage
 - **Fail-safe**: Never blocks commits even if something goes wrong
 
 ## Installation
@@ -39,16 +39,19 @@ sayu init
 
 This will:
 - Install Git hooks (commit-msg, post-commit)
-- Create local database (`~/.sayu/events.db`)
 - Generate config file (`.sayu.yml`)
 
-### 2. Set API Key (System Environment)
+### 2. Set API Key
 
-Set your API key as a system environment variable:
+Set your API key as an environment variable:
 
 ```bash
-# Gemini API key (required)
+# Gemini API key (recommended)
 export SAYU_GEMINI_API_KEY=your_api_key_here
+
+# Or OpenRouter API key
+export SAYU_OPENROUTER_API_KEY=your_api_key_here
+export SAYU_LLM_PROVIDER=openrouter
 ```
 
 ### 3. Commit as usual
@@ -62,21 +65,20 @@ Result:
 ```
 Fix authentication bug
 
----
-AI-Context (sayu)
+---思惟---
 
 Intent:
   Fix JWT token validation logic to resolve login failures
 
-Changes:
+What Changed:
   Improved exception handling in auth.js token decoding
   Added test cases for expired tokens in test/auth.test.js
 
-Context:
+Conversation Flow:
   Discussed error handling approaches with Claude for token expiration.
   Identified need for more granular exception handling.
   Found and fixed several edge cases during test implementation.
----
+---FIN---
 ```
 
 ## Commands
@@ -97,67 +99,78 @@ sayu collector cli-uninstall
 
 ```yaml
 # Sayu Configuration
-# AI automatically collects your development context
+# Captures the 'why' behind your code changes
+
+language: ko              # Language (ko, en)
+commitTrailer: true       # Add AI analysis to commit messages
 
 connectors:
-  claude: true
-  cursor: true
-  editor: true
+  claude: true            # Claude Desktop conversation collection
+  cursor: true            # Cursor editor conversation collection
   cli:
-    mode: "zsh-preexec"   # or "atuin" | "off"
+    mode: "zsh-preexec"   # CLI command collection (or "off")
 
-privacy:
-  maskSecrets: true       # Mask sensitive information
-  masks:                  # Additional masking patterns (regex)
-    - "AKIA[0-9A-Z]{16}"  # AWS Access Key
-    - "(?i)authorization:\\s*Bearer\\s+[A-Za-z0-9._-]+"
-
-output:
-  commitTrailer: true     # Add trailer to commit messages
+# Environment variables override:
+# SAYU_ENABLED=false
+# SAYU_LANG=en
+# SAYU_TRAILER=false
 ```
 
 ## Environment Variables
 
 ```bash
-# Language and feature toggles
+# Core settings
 export SAYU_ENABLED=false              # Disable Sayu
-export SAYU_LANG=en                   # Language (ko | en)
-export SAYU_TRAILER=false             # Disable commit trailer
+export SAYU_LANG=en                    # Language (ko | en)
+export SAYU_TRAILER=false              # Disable commit trailer
 
-# API Keys (system environment variables)
-export SAYU_GEMINI_API_KEY=your-key-here
-export SAYU_OPENROUTER_API_KEY=your-key-here    # Optional: for OpenRouter
-export SAYU_LLM_PROVIDER=gemini              # LLM provider (gemini | openrouter)
+# LLM Configuration
+export SAYU_GEMINI_API_KEY=your-key    # Gemini API key
+export SAYU_OPENROUTER_API_KEY=your-key # OpenRouter API key
+export SAYU_LLM_PROVIDER=gemini        # LLM provider (gemini | openrouter)
+export SAYU_OPENROUTER_MODEL=anthropic/claude-3-haiku  # OpenRouter model
+
+# Debug
+export SAYU_DEBUG=true                 # Enable debug logging
 ```
 
 ## FAQ
 
-### Q: How do I add support for a new AI tool?
-A: Create a new collector in `domain/collectors/`:
+### Q: Where is my data stored?
+A: Sayu uses in-memory storage only. Conversations are collected during commit and immediately discarded after processing. No persistent database is created.
 
-1. Create new file based on existing collectors (claude.py, cursor.py)
-2. Implement `pull_since()` method (collect conversations in time range)
-3. Implement `discover()` method (check if tool is installed)
-4. Register in `domain/collectors/manager.py`
+### Q: How do I add support for a new AI tool?
+A: Create a new collector by extending `ConversationCollector` in `domain/collectors/conversation.py`
 
 ### Q: How do I change the summary language?
-A: Change `language` in `.sayu.yml` or add new language in `i18n/prompts/`
+A: Change `language` in `.sayu.yml` or set `SAYU_LANG` environment variable
 
-### Q: How do I manage cache buildup?
-A: Cache files older than 1 hour are automatically cleaned on commit. For manual cleanup: `rm -rf .sayu/cache/`
+### Q: How do I disable Sayu temporarily?
+A: Set `SAYU_ENABLED=false` or use `--no-verify` with git commit
 
-### Q: How do I protect sensitive information?
-A: Set `privacy.maskSecrets` to `true` in `.sayu.yml` and add regex patterns to `masks`
+### Q: What if the LLM API fails?
+A: Sayu is fail-safe. If LLM fails, your commit proceeds normally with a fallback message.
 
-## Target Users
+## Privacy & Security
 
-- Developers using Cursor + Claude for coding
-- Teams that value commit history quality
-- Anyone who wants to preserve AI conversation context
+- All processing happens locally on your machine
+- No data is sent except to your configured LLM API
+- No persistent storage or logging of conversations
+- API keys are only read from environment variables
 
-## Contributing
+## Troubleshooting
 
-Issues and PRs are welcome!
+```bash
+# Enable debug mode for detailed logs
+export SAYU_DEBUG=true
+git commit -m "test"
+
+# Check if collectors are working
+sayu health
+
+# Test LLM connection
+sayu preview
+```
 
 ## License
 

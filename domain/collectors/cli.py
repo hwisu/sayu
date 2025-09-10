@@ -90,11 +90,7 @@ class CliCollector:
         # For CLI events, we primarily redact the text field
         text = event.text
         
-        # Apply privacy masks if configured
-        if cfg.privacy.maskSecrets:
-            for pattern in cfg.privacy.masks:
-                import re
-                text = re.sub(pattern, '[REDACTED]', text)
+        # No privacy masking in simplified version
         
         # Create new event with redacted text
         return Event(

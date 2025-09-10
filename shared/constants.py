@@ -1,55 +1,23 @@
 """Sayu system constants and default values"""
 
-from enum import Enum
-from typing import Final, List
+from typing import Final
 
 # Time-related constants
-COMMIT_WINDOW_HOURS: Final[int] = 24
-GRACE_PERIOD_MINUTES: Final[int] = 5
-DEFAULT_LOOKBACK_HOURS: Final[int] = 168  # One week
-CACHE_TTL_SECONDS: Final[int] = 300
-COLLECTOR_TIMEOUT_MS: Final[int] = 5000
+DEFAULT_LOOKBACK_HOURS: Final[int] = 24  # Default time window for event collection
+CACHE_TTL_SECONDS: Final[int] = 3600  # Cache TTL (1 hour)
 
 # Text processing constants
-MAX_CONVERSATION_COUNT: Final[int] = 20
-MAX_CONVERSATION_LENGTH: Final[int] = 800
-MAX_SIMPLIFIED_CONVERSATIONS: Final[int] = 10
-MAX_SIMPLIFIED_LENGTH: Final[int] = 400
-MAX_HIGH_VALUE_EVENTS: Final[int] = 80
-MAX_DIFF_LENGTH: Final[int] = 2000
-MIN_RESPONSE_LENGTH: Final[int] = 50
-MAX_COMMIT_TRAILER_LINES: Final[int] = 12
-MAX_LINE_LENGTH: Final[int] = 80
-MAX_RAW_RESPONSE_LENGTH: Final[int] = 2000
-MAX_FILE_DISPLAY: Final[int] = 3
+MAX_CONVERSATION_COUNT: Final[int] = 20  # Maximum conversations to include
+MAX_CONVERSATION_LENGTH: Final[int] = 800  # Maximum length per conversation
+MAX_SIMPLIFIED_CONVERSATIONS: Final[int] = 10  # For simplified mode
+MAX_SIMPLIFIED_LENGTH: Final[int] = 400  # For simplified mode
+MAX_LINE_LENGTH: Final[int] = 80  # Maximum line length in commit trailer
+MAX_RAW_RESPONSE_LENGTH: Final[int] = 2000  # Maximum raw response length
 
 # LLM API constants
-LLM_TEMPERATURE: Final[float] = 0.1
-LLM_MAX_OUTPUT_TOKENS: Final[int] = 8192
-
-# Filtering constants
-MIN_RELEVANCE_SCORE: Final[float] = 0.6
-DEFAULT_DOMAIN_ALLOWLIST: Final[List[str]] = [
-    'github.com',
-    'developer.mozilla.org',
-    'stackoverflow.com'
-]
-
-# Default security masking patterns
-DEFAULT_SECURITY_MASKS: Final[List[str]] = [
-    r'AKIA[0-9A-Z]{16}',  # AWS Access Key
-    r'(?i)authorization:\s*Bearer\s+[A-Za-z0-9._-]+',  # Bearer token
-    r'(?i)api[_-]?key[\'"\\s]*[:=][\'"\\s]*[A-Za-z0-9]{20,}',  # API key
-    r'(?i)secret[\'"\\s]*[:=][\'"\\s]*[A-Za-z0-9]{10,}',  # Secret
-]
+LLM_TEMPERATURE: Final[float] = 0.3  # Temperature for LLM generation
+LLM_MAX_OUTPUT_TOKENS: Final[int] = 1024  # Maximum output tokens
 
 # Summary formatting constants
 SUMMARY_SEPARATOR: Final[str] = '---思惟---\n\n'
 SUMMARY_FOOTER: Final[str] = '\n---FIN---'
-
-
-class CollectorMode(Enum):
-    """Collector operation modes"""
-    OFF = "off"
-    READ = "read"
-    WRITE = "write"
