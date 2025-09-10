@@ -150,7 +150,7 @@ def health():
         # Check config
         try:
             config_manager = ConfigManager(repo_root)
-            config = config_manager.get_user_config()
+            config = config_manager.get()
             print(f"✅ Config loaded (language: {config.language})")
         except:
             print("❌ Config loading failed")

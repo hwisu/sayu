@@ -31,7 +31,7 @@ class HookHandlers:
             # Load config
             progress.step("Loading configuration...", "📋")
             config_manager = ConfigManager(repo_root)
-            config = config_manager.get_user_config()
+            config = config_manager.get()
             
             if not config.enabled:
                 return
@@ -220,7 +220,7 @@ class HookHandlers:
             
             # Try to generate summary using new system
             config_manager = ConfigManager(repo_root)
-            config = config_manager.get_user_config()
+            config = config_manager.get()
             
             try:
                 # Use new context collection system
