@@ -544,25 +544,35 @@ async fn handle_commit_msg(repo_root: &Path, msg_file: &str) -> Result<()> {
     // Generate summary using LLM
     match EventSummarizer::new() {
         Ok(mut summarizer) => {
+            // Write to stderr and also to a log file for visibility
+            let log_msg = "🤖 Generating AI summary...";
+            eprintln!("{}", log_msg);
+            std::fs::write("/tmp/sayu_last_commit.log", format!("{}\n", log_msg)).ok();
+            
             match summarizer.summarize_for_commit(all_events, &commit_message, language).await {
                 Ok(summary) => {
                     // Append summary to commit message
                     let updated_message = format!("{}\n{}", commit_message.trim(), summary);
                     std::fs::write(msg_file, updated_message)?;
+                    let success_msg = "✓ AI summary added to commit message";
+                    eprintln!("{}", success_msg);
+                    std::fs::write("/tmp/sayu_last_commit.log", format!("{}\n", success_msg)).ok();
                 }
                 Err(e) => {
                     // Don't block commit on LLM errors
-                    if std::env::var("SAYU_DEBUG").is_ok() {
-                        eprintln!("Failed to generate summary: {}", e);
-                    }
+                    let err_msg = format!("⚠️  AI summary failed: {}", e);
+                    eprintln!("{}", err_msg);
+                    std::fs::write("/tmp/sayu_last_commit.log", err_msg).ok();
                 }
             }
         }
         Err(e) => {
             // Don't block commit if LLM is not configured
-            if std::env::var("SAYU_DEBUG").is_ok() {
-                eprintln!("Failed to initialize summarizer: {}", e);
-            }
+            let err_msg = format!("⚠️  AI summarizer not available: {}\n    Set SAYU_GEMINI_API_KEY environment variable to enable AI summaries", e);
+            eprintln!("{}", err_msg);
+            
+            // Also write to a log file so users can check what happened
+            std::fs::write("/tmp/sayu_last_commit.log", &err_msg).ok();
         }
     }
     
