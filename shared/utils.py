@@ -183,38 +183,3 @@ class ProgressTracker:
         timestamp = datetime.now().strftime("%H:%M:%S")
         print(f"[{timestamp}] ✅ {message} (total: {total_duration:.1f}s)", file=sys.stderr)
 
-
-class ShellExecutor:
-    """Execute shell commands safely"""
-    
-    @staticmethod
-    def run(command: List[str], **kwargs) -> subprocess.CompletedProcess:
-        """Run command with defaults"""
-        defaults = {
-            'capture_output': True,
-            'text': True,
-            'check': False
-        }
-        defaults.update(kwargs)
-        return subprocess.run(command, **defaults)
-    
-    @staticmethod
-    async def run_async(command: List[str], **kwargs) -> str:
-        """Run command asynchronously"""
-        import asyncio
-        
-        proc = await asyncio.create_subprocess_exec(
-            *command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            **kwargs
-        )
-        
-        stdout, stderr = await proc.communicate()
-        
-        if proc.returncode != 0 and kwargs.get('check', False):
-            raise subprocess.CalledProcessError(
-                proc.returncode, command, stdout, stderr
-            )
-        
-        return stdout.decode() if stdout else ''

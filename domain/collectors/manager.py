@@ -2,13 +2,13 @@
 
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Optional, Tuple, Any
+from typing import List, Optional, Any
 
-from domain.events.types import Event, Config
 from domain.events.store_manager import StoreManager
 from infra.config.manager import ConfigManager
 from infra.cache.manager import CacheManager, CollectorCache
 from domain.git.hooks import GitHookManager
+from domain.events.types import Event
 from .git import GitCollector
 from .cli import CliCollector
 from .cursor import CursorCollector
@@ -47,7 +47,7 @@ class CollectorManager:
         
         # Store diff information if available
         if git_context['diff']:
-            from domain.events.types import Event, EventSource, EventKind, Actor
+            from domain.events.types import EventSource, EventKind, Actor
             import uuid
             import time
             

@@ -45,24 +45,6 @@ class I18nManager:
         """Get output templates for current language"""
         return ko_outputs if self.current_language == 'ko' else en_outputs
     
-    def t(self, path: str, *args: Any) -> str:
-        """Translate using dot notation path"""
-        outputs = self.get_outputs()
-        keys = path.split('.')
-        current = outputs
-        
-        for key in keys:
-            current = current.get(key)
-            if current is None:
-                print(f"Warning: Translation key not found: {path}")
-                return path  # Return path if key not found
-        
-        # If it's a function, call it with arguments
-        if callable(current):
-            return current(*args)
-        
-        return str(current)
-    
     def get_main_analysis_prompt(
         self, 
         conversations: str, 

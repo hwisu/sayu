@@ -2,9 +2,9 @@
 
 ko_outputs = {
     # Git trailer related
-    'trailer_header': 'AI-Context (sayu)',
+    'trailer_header': '思惟---',
     'trailer_labels': {
-        'intent': 'Intent:',
+        'intent': '의도:',
         'what_changed': '변경된 내용:',
         'conversation_flow': '대화 흐름:'
     },

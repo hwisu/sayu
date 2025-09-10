@@ -3,7 +3,7 @@
 from typing import List
 
 from domain.events.types import Event
-from shared.constants import MAX_FILE_DISPLAY, SUMMARY_SEPARATOR, SUMMARY_FOOTER
+from shared.constants import MAX_FILE_DISPLAY
 
 
 class MinimalSummaryGenerator:
@@ -14,7 +14,7 @@ class MinimalSummaryGenerator:
         """Generate minimal summary"""
         lines = []
         lines.append('---')
-        lines.append('AI-Context (sayu)')
+        lines.append('Thought---')
         
         # File information
         if staged_files:

@@ -3,9 +3,9 @@
 import json
 import sqlite3
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 
-from .types import Event, EventRow, EventSource, EventKind, Actor
+from .types import Event, EventSource, EventKind, Actor
 
 
 class EventStore:

@@ -5,7 +5,7 @@ import re
 from typing import List, Dict, Any
 
 from domain.events.types import Event
-from infra.api.llm import LLMApiClient
+from infra.api.llm_factory import LLMFactory
 from i18n import i18n
 from shared.constants import (
     MAX_CONVERSATION_COUNT, MAX_CONVERSATION_LENGTH,
@@ -21,7 +21,7 @@ class LLMSummaryGenerator:
     def generate(llm_events: List[Event], staged_files: List[str], diff_stats: str) -> str:
         """Generate main LLM summary"""
         prompt = LLMSummaryGenerator._build_prompt(llm_events, staged_files, diff_stats)
-        response = LLMApiClient.call_llm(prompt)
+        response = LLMFactory.call_llm(prompt)
         
         try:
             # Try to extract JSON from markdown code blocks
@@ -45,7 +45,7 @@ class LLMSummaryGenerator:
         simple_prompt = i18n_manager.get_simplified_analysis_prompt(
             conversations_text, staged_files, diff_stats
         )
-        response = LLMApiClient.call_llm(simple_prompt)
+        response = LLMFactory.call_llm(simple_prompt)
         
         try:
             # Try to extract JSON from markdown code blocks

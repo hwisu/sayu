@@ -1,6 +1,5 @@
 """Store manager singleton for event database"""
 
-from pathlib import Path
 from .store import EventStore
 
 

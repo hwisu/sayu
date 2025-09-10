@@ -15,6 +15,7 @@ class EventSource(str, Enum):
     CLI = 'cli'
     BROWSER = 'browser'
     GIT = 'git'
+    FILE = 'file'  # File system events
 
 
 class EventKind(str, Enum):

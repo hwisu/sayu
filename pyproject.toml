@@ -54,7 +54,7 @@ Repository = "https://github.com/hwisu/sayu.git"
 Issues = "https://github.com/hwisu/sayu/issues"
 
 [tool.setuptools.packages.find]
-include = ["cli*", "domain*", "i18n*", "infra*", "shared*"]
+include = ["cli*", "daemon*", "domain*", "i18n*", "infra*", "shared*"]
 
 [tool.black]
 line-length = 100
