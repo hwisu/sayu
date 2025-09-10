@@ -463,16 +463,16 @@ async fn handle_post_commit(repo_root: &Path) -> Result<()> {
     // Store the commit event
     let storage = Storage::new(repo_root)?;
     
-    // Get latest commit info
+    // Get latest commit info and timestamp
     let output = Command::new("git")
-        .args(["log", "-1", "--pretty=format:%H|%s|%an"])
+        .args(["log", "-1", "--pretty=format:%H|%s|%an|%ct"])
         .current_dir(repo_root)
         .output()?;
     
     let commit_info = String::from_utf8(output.stdout)?;
     let parts: Vec<&str> = commit_info.split('|').collect();
     
-    if parts.len() >= 2 {
+    if parts.len() >= 4 {
         let repo_name = repo_root.file_name()
             .and_then(|s| s.to_str())
             .unwrap_or("unknown");
@@ -485,6 +485,50 @@ async fn handle_post_commit(repo_root: &Path) -> Result<()> {
         );
         
         storage.save_event(&event)?;
+        
+        // Get commit timestamp in milliseconds
+        let commit_timestamp_secs: i64 = parts[3].parse().unwrap_or(0);
+        let since_ts = Some(commit_timestamp_secs * 1000);
+        
+        // Run collectors to gather context
+        let claude_collector = ClaudeCollector::new();
+        let cursor_collector = CursorCollector::new();
+        let cli_collector = CliCollector::new()?;
+        
+        // Collect in parallel
+        let (claude_events, cursor_events, cli_events) = tokio::join!(
+            claude_collector.collect(repo_root, since_ts),
+            cursor_collector.collect(repo_root, since_ts),
+            cli_collector.collect(repo_root, since_ts)
+        );
+        
+        // Store collected events
+        let mut total_events = 0;
+        
+        if let Ok(events) = claude_events {
+            for event in events {
+                storage.save_event(&event)?;
+                total_events += 1;
+            }
+        }
+        
+        if let Ok(events) = cursor_events {
+            for event in events {
+                storage.save_event(&event)?;
+                total_events += 1;
+            }
+        }
+        
+        if let Ok(events) = cli_events {
+            for event in events {
+                storage.save_event(&event)?;
+                total_events += 1;
+            }
+        }
+        
+        if total_events > 0 {
+            println!("📝 Collected {} context events for commit", total_events);
+        }
     }
     
     Ok(())

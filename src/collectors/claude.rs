@@ -203,13 +203,13 @@ impl ClaudeCollector {
         if let Some(since) = since_ts {
             if self.debug {
                 let before = events.len();
-                events.retain(|e| e.ts > since);
+                events.retain(|e| e.ts >= since);
                 let after = events.len();
                 if before != after {
                     println!("Claude: Filtered {} -> {} events (since {})", before, after, since);
                 }
             } else {
-                events.retain(|e| e.ts > since);
+                events.retain(|e| e.ts >= since);
             }
         }
         
