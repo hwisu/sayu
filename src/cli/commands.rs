@@ -412,6 +412,26 @@ async fn handle_commit_msg(repo_root: &Path, msg_file: &str) -> Result<()> {
         println!("Collected {} events for commit summary", all_events.len());
     }
     
+    // Get git diff for staged changes
+    let diff_output = Command::new("git")
+        .args(["diff", "--cached", "--stat"])
+        .current_dir(repo_root)
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .unwrap_or_default();
+    
+    // Add diff as a special event if not empty
+    if !diff_output.is_empty() {
+        let diff_event = Event::new(
+            EventSource::Git,
+            EventKind::Diff,
+            "git-diff".to_string(),
+            format!("Changed files:\n{}", diff_output),
+        );
+        all_events.push(diff_event);
+    }
+    
     // Generate summary using LLM
     match EventSummarizer::new() {
         Ok(mut summarizer) => {
