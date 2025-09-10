@@ -1,6 +1,6 @@
 [package]
 name = "sayu"
-version = "0.9.0"
+version = "0.10.0"
 edition = "2021"
 authors = ["hwisu"]
 description = "Personal local blackbox for recording 'why' in commits"

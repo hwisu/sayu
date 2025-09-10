@@ -13,7 +13,8 @@ pub struct ClaudeCollector {
 
 #[derive(Debug, Deserialize)]
 struct ClaudeMessage {
-    timestamp: Option<i64>,
+    #[serde(default)]
+    timestamp: Option<serde_json::Value>,  // Can be i64 or string
     role: Option<String>,
     text: Option<String>,
     content: Option<String>,
@@ -86,6 +87,7 @@ impl ClaudeCollector {
         
         let mut events = Vec::new();
         
+        // First pass: collect all messages and parse timestamps
         for line in content.lines() {
             if line.trim().is_empty() {
                 continue;
@@ -93,15 +95,24 @@ impl ClaudeCollector {
             
             match serde_json::from_str::<ClaudeMessage>(line) {
                 Ok(msg) => {
-                    // Extract timestamp
-                    let timestamp = msg.timestamp.unwrap_or(0);
-                    
-                    // Skip if before since_ts
-                    if let Some(since) = since_ts {
-                        if timestamp <= since {
-                            continue;
+                    // Extract timestamp - handle both i64 and ISO string formats
+                    let timestamp = match msg.timestamp {
+                        Some(serde_json::Value::Number(n)) => {
+                            n.as_i64().unwrap_or(0)
                         }
-                    }
+                        Some(serde_json::Value::String(s)) => {
+                            // Parse ISO 8601 timestamp
+                            chrono::DateTime::parse_from_rfc3339(&s)
+                                .map(|dt| dt.timestamp_millis())
+                                .unwrap_or_else(|_| {
+                                    if self.debug {
+                                        println!("Failed to parse timestamp: {}", s);
+                                    }
+                                    0
+                                })
+                        }
+                        _ => 0,
+                    };
                     
                     // Extract text (prefer text over content)
                     let text = msg.text.or(msg.content).unwrap_or_default();
@@ -150,6 +161,11 @@ impl ClaudeCollector {
                 }
                 _ => {}
             }
+        }
+        
+        // Second pass: filter by timestamp
+        if let Some(since) = since_ts {
+            events.retain(|e| e.ts > since);
         }
         
         Ok(events)
