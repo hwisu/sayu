@@ -74,7 +74,7 @@ class HookHandlers:
                 progress.step(f"Processing {len(recent_events)} events...", "⚡")
                 llm_events = []
                 for e in recent_events:
-                    if e.source in [EventSource.LLM]:
+                    if e.source in [EventSource.CLAUDE, EventSource.CURSOR]:
                         # Only include if the event repo exactly matches current repo
                         if e.repo and os.path.abspath(e.repo) == os.path.abspath(repo_root):
                             llm_events.append(e)
@@ -240,7 +240,7 @@ class HookHandlers:
                 print(f"Found {len(recent_events)} total events")
                 
                 # Filter for LLM events
-                llm_events = [e for e in recent_events if e.source in [EventSource.LLM]]
+                llm_events = [e for e in recent_events if e.source in [EventSource.CLAUDE, EventSource.CURSOR]]
                 cli_events = [e for e in recent_events if e.source == EventSource.CLI]
                 git_events = [e for e in recent_events if e.source == EventSource.GIT]
                 
