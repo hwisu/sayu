@@ -42,8 +42,14 @@ class Summarizer:
         if not events:
             return []
         
-        # Sort events by timestamp
-        sorted_events = sorted(events, key=lambda e: e.timestamp)
+        # Sort events by timestamp (make all timezone-naive for comparison)
+        def get_naive_timestamp(event):
+            timestamp = event.timestamp
+            if timestamp.tzinfo is not None:
+                return timestamp.replace(tzinfo=None)
+            return timestamp
+        
+        sorted_events = sorted(events, key=get_naive_timestamp)
         
         # Group events by timeframe
         timeframes = []
@@ -51,7 +57,12 @@ class Summarizer:
         frame_start = sorted_events[0].timestamp
         
         for event in sorted_events:
-            if event.timestamp - frame_start <= timeframe:
+            # Make timestamps timezone-naive for comparison
+            event_timestamp = event.timestamp
+            if event_timestamp.tzinfo is not None:
+                event_timestamp = event_timestamp.replace(tzinfo=None)
+            
+            if event_timestamp - frame_start <= timeframe:
                 current_frame.append(event)
             else:
                 if current_frame:
@@ -61,7 +72,7 @@ class Summarizer:
                         "events": current_frame
                     })
                 current_frame = [event]
-                frame_start = event.timestamp
+                frame_start = event_timestamp
         
         # Add last frame
         if current_frame:

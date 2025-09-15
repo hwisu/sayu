@@ -32,8 +32,14 @@ class TimelineVisualizer:
             self.console.print("[yellow]No events to display[/yellow]")
             return
         
-        # Sort events by timestamp
-        sorted_events = sorted(events, key=lambda e: e.timestamp)
+        # Sort events by timestamp (make all timezone-naive for comparison)
+        def get_naive_timestamp(event):
+            timestamp = event.timestamp
+            if timestamp.tzinfo is not None:
+                return timestamp.replace(tzinfo=None)
+            return timestamp
+        
+        sorted_events = sorted(events, key=get_naive_timestamp)
         
         # Create table
         table = Table(title="Event Timeline", show_header=True)
@@ -116,8 +122,14 @@ class TimelineVisualizer:
             sources[event.source] = sources.get(event.source, 0) + 1
             types[event.type.value] = types.get(event.type.value, 0) + 1
         
-        # Time range
-        sorted_events = sorted(events, key=lambda e: e.timestamp)
+        # Time range (make all timezone-naive for comparison)
+        def get_naive_timestamp(event):
+            timestamp = event.timestamp
+            if timestamp.tzinfo is not None:
+                return timestamp.replace(tzinfo=None)
+            return timestamp
+        
+        sorted_events = sorted(events, key=get_naive_timestamp)
         time_range = sorted_events[-1].timestamp - sorted_events[0].timestamp
         
         # Display stats

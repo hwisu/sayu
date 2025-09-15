@@ -12,12 +12,13 @@ from ..core import Collector, Event, EventType
 class GitCollector(Collector):
     """Collects Git events like commits, checkouts, branches, etc."""
     
-    def __init__(self, repo_path: Optional[Path] = None):
+    def __init__(self, repo_path: Optional[Path] = None, commit_range: Optional[str] = None):
         """Initialize Git collector."""
         self.repo_path = repo_path or Path.cwd()
         self.git_dir = self.repo_path / ".git"
         self.last_commit_hash = None
         self.last_branch = None
+        self.commit_range = commit_range  # e.g., "HEAD~1..HEAD", "abc123..def456"
     
     @property
     def name(self) -> str:
@@ -28,6 +29,10 @@ class GitCollector(Collector):
         """Collect Git events since the given timestamp."""
         if not self.git_dir.exists():
             return []
+        
+        # Make since timezone-naive if it's timezone-aware
+        if since and since.tzinfo is not None:
+            since = since.replace(tzinfo=None)
         
         events = []
         
@@ -100,13 +105,66 @@ class GitCollector(Collector):
             pass
         return None
     
+    def _get_last_commit_time(self) -> Optional[datetime]:
+        """Get the timestamp of the last commit."""
+        try:
+            result = subprocess.run(
+                ["git", "log", "-1", "--pretty=format:%ad", "--date=iso"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                date_str = result.stdout.strip()
+                # Remove timezone info and normalize format
+                if '+' in date_str:
+                    date_str = date_str.split('+')[0].strip()
+                elif date_str.endswith('Z'):
+                    date_str = date_str[:-1].strip()
+                # Replace space with T for ISO format
+                if ' ' in date_str:
+                    date_str = date_str.replace(' ', 'T')
+                return datetime.fromisoformat(date_str)
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
+            pass
+        return None
+    
+    def _get_commit_time(self, commit_ref: str) -> Optional[datetime]:
+        """Get the timestamp of a specific commit."""
+        try:
+            result = subprocess.run(
+                ["git", "log", "-1", "--pretty=format:%ad", "--date=iso", commit_ref],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                date_str = result.stdout.strip()
+                # Remove timezone info and normalize format
+                if '+' in date_str:
+                    date_str = date_str.split('+')[0].strip()
+                elif date_str.endswith('Z'):
+                    date_str = date_str[:-1].strip()
+                # Replace space with T for ISO format
+                if ' ' in date_str:
+                    date_str = date_str.replace(' ', 'T')
+                return datetime.fromisoformat(date_str)
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
+            pass
+        return None
+    
     def _get_recent_commits(self, since: Optional[datetime] = None) -> List[Dict[str, Any]]:
         """Get recent commits."""
         try:
             # Build git log command
             cmd = ["git", "log", "--pretty=format:%H|%an|%ae|%ad|%s", "--date=iso"]
             
-            if since:
+            # Use commit range if specified
+            if self.commit_range:
+                cmd.append(self.commit_range)
+            elif since:
                 cmd.extend(["--since", since.isoformat()])
             else:
                 # Get last 10 commits if no since date
@@ -225,7 +283,15 @@ class GitCollector(Collector):
     
     def _create_commit_event(self, commit: Dict[str, Any]) -> Event:
         """Create commit event."""
-        timestamp = datetime.fromisoformat(commit['date'].replace(' ', 'T'))
+        # Parse ISO format datetime and make it timezone-naive
+        date_str = commit['date']
+        if '+' in date_str:
+            date_str = date_str.split('+')[0].strip()
+        elif date_str.endswith('Z'):
+            date_str = date_str[:-1].strip()
+        if ' ' in date_str:
+            date_str = date_str.replace(' ', 'T')
+        timestamp = datetime.fromisoformat(date_str)
         
         content = f"커밋: {commit['message']}"
         if len(commit['message']) > 50:
@@ -248,7 +314,15 @@ class GitCollector(Collector):
     
     def _create_checkout_event(self, checkout: Dict[str, Any]) -> Event:
         """Create checkout event."""
-        timestamp = datetime.fromisoformat(checkout['date'].replace(' ', 'T'))
+        # Parse ISO format datetime and make it timezone-naive
+        date_str = checkout['date']
+        if '+' in date_str:
+            date_str = date_str.split('+')[0].strip()
+        elif date_str.endswith('Z'):
+            date_str = date_str[:-1].strip()
+        if ' ' in date_str:
+            date_str = date_str.replace(' ', 'T')
+        timestamp = datetime.fromisoformat(date_str)
         
         # Extract branch name from checkout message
         message = checkout['message']
@@ -279,7 +353,15 @@ class GitCollector(Collector):
     
     def _create_merge_event(self, merge: Dict[str, Any]) -> Event:
         """Create merge event."""
-        timestamp = datetime.fromisoformat(merge['date'].replace(' ', 'T'))
+        # Parse ISO format datetime and make it timezone-naive
+        date_str = merge['date']
+        if '+' in date_str:
+            date_str = date_str.split('+')[0].strip()
+        elif date_str.endswith('Z'):
+            date_str = date_str[:-1].strip()
+        if ' ' in date_str:
+            date_str = date_str.replace(' ', 'T')
+        timestamp = datetime.fromisoformat(date_str)
         
         content = f"머지: {merge['message']}"
         if len(merge['message']) > 50:

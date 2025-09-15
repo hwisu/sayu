@@ -128,7 +128,14 @@ class Storage:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(query, params)
             result = cursor.fetchone()[0]
-            return datetime.fromisoformat(result) if result else None
+            if result:
+                # Parse ISO format datetime and make it timezone-naive
+                date_str = result
+                if '+' in date_str or date_str.endswith('Z'):
+                    # Remove timezone info to make it naive
+                    date_str = date_str.split('+')[0].split('Z')[0]
+                return datetime.fromisoformat(date_str)
+            return None
     
     def clear(self) -> None:
         """Clear all events from storage."""

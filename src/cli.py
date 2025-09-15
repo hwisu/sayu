@@ -115,8 +115,9 @@ def timeline(last: int, source: str, verbose: bool):
 @cli.command()
 @click.option("-h", "--hours", type=int, help="Timeframe in hours")
 @click.option("-e", "--engine", help="LLM engine command")
-@click.option("--last", type=int, default=24, help="Look back N hours")
-def summarize(hours: int, engine: str, last: int):
+@click.option("--last", type=int, help="Look back N hours (default: since last commit)")
+@click.option("--since-commit", is_flag=True, default=True, help="Use last commit as reference point")
+def summarize(hours: int, engine: str, last: int, since_commit: bool):
     """Summarize events within timeframes."""
     config = Config()
     storage = Storage(config.db_path)
@@ -126,8 +127,22 @@ def summarize(hours: int, engine: str, last: int):
     timeframe_hours = hours or config.timeframe_hours
     timeframe = timedelta(hours=timeframe_hours)
     
-    # Get events from last N hours
-    since = datetime.now() - timedelta(hours=last)
+    # Get events - default to since last commit
+    if since_commit and not last:
+        git_collector = GitCollector()
+        last_commit_time = git_collector._get_last_commit_time()
+        if last_commit_time:
+            since = last_commit_time
+            console.print(f"[dim]Summarizing events since last commit: {since.strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
+        else:
+            console.print("[yellow]No commits found, using last 24 hours[/yellow]")
+            since = datetime.now() - timedelta(hours=24)
+    else:
+        # Use time-based approach
+        hours_back = last or 24
+        since = datetime.now() - timedelta(hours=hours_back)
+        console.print(f"[dim]Summarizing events from last {hours_back} hours[/dim]")
+    
     events = storage.get_events(since=since)
     
     if not events:
@@ -153,6 +168,134 @@ def summarize(hours: int, engine: str, last: int):
     
     # Show results
     visualizer.show_summary_timeline(summaries)
+
+
+@cli.command()
+@click.option("-e", "--engine", help="LLM engine command")
+def summarize_since_last_commit(engine: str):
+    """Summarize events since the last commit."""
+    config = Config()
+    storage = Storage(config.db_path)
+    visualizer = TimelineVisualizer()
+    
+    # Get last commit time
+    git_collector = GitCollector()
+    last_commit_time = git_collector._get_last_commit_time()
+    
+    if not last_commit_time:
+        console.print("[yellow]No commits found in this repository[/yellow]")
+        return
+    
+    console.print(f"[dim]Collecting events since last commit: {last_commit_time.strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
+    
+    # Get events since last commit
+    events = storage.get_events(since=last_commit_time)
+    
+    if not events:
+        console.print("[yellow]No events found since last commit[/yellow]")
+        return
+    
+    # Create summarizer
+    if engine:
+        summarizer = Summarizer(LLMProvider.CUSTOM)
+        command = engine
+    else:
+        provider = LLMProvider(config.default_provider)
+        summarizer = Summarizer(provider)
+        command = None
+    
+    # Summarize all events since last commit
+    with console.status("[bold green]Summarizing events since last commit..."):
+        summary = summarizer.summarize_all(events, command=command)
+    
+    # Show results
+    console.print(f"\n[bold]Summary since last commit ({len(events)} events):[/bold]")
+    console.print(summary)
+
+
+@cli.command()
+@click.argument('commit_range', required=False)
+@click.option("-e", "--engine", help="LLM engine command")
+@click.option("--show-events", is_flag=True, help="Show events before summary")
+def diff(commit_range: str, engine: str, show_events: bool):
+    """Show events and summary between commits.
+    
+    Examples:
+    sayu diff                    # Show events since last commit
+    sayu diff HEAD~1..HEAD       # Show events between last 2 commits
+    sayu diff abc123..def456     # Show events between specific commits
+    """
+    config = Config()
+    storage = Storage(config.db_path)
+    visualizer = TimelineVisualizer()
+    
+    # Initialize git collector
+    git_collector = GitCollector()
+    
+    # Get commit range
+    if not commit_range:
+        # Default: since last commit
+        last_commit_time = git_collector._get_last_commit_time()
+        if not last_commit_time:
+            console.print("[yellow]No commits found in this repository[/yellow]")
+            return
+        since_time = last_commit_time
+        console.print(f"[dim]Collecting events since last commit: {since_time.strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
+    else:
+        # Parse commit range
+        if '..' in commit_range:
+            from_commit, to_commit = commit_range.split('..', 1)
+            since_time = git_collector._get_commit_time(from_commit)
+            until_time = git_collector._get_commit_time(to_commit)
+            
+            if not since_time:
+                console.print(f"[red]Commit {from_commit} not found[/red]")
+                return
+            if not until_time:
+                console.print(f"[red]Commit {to_commit} not found[/red]")
+                return
+                
+            console.print(f"[dim]Collecting events between {from_commit} and {to_commit}[/dim]")
+            console.print(f"[dim]Time range: {since_time.strftime('%Y-%m-%d %H:%M:%S')} - {until_time.strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
+        else:
+            # Single commit - show events since that commit
+            since_time = git_collector._get_commit_time(commit_range)
+            if not since_time:
+                console.print(f"[red]Commit {commit_range} not found[/red]")
+                return
+            console.print(f"[dim]Collecting events since commit {commit_range}: {since_time.strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
+    
+    # Get events in the range
+    if 'until_time' in locals():
+        events = storage.get_events(since=since_time, until=until_time)
+    else:
+        events = storage.get_events(since=since_time)
+    
+    if not events:
+        console.print("[yellow]No events found in the specified range[/yellow]")
+        return
+    
+    # Show events if requested
+    if show_events:
+        console.print(f"\n[bold]Events ({len(events)} total):[/bold]")
+        visualizer.show_timeline(events)
+    
+    # Create summarizer
+    if engine:
+        summarizer = Summarizer(LLMProvider.CUSTOM)
+        command = engine
+    else:
+        provider = LLMProvider(config.default_provider)
+        summarizer = Summarizer(provider)
+        command = None
+    
+    # Summarize events
+    with console.status("[bold green]Summarizing events..."):
+        summary = summarizer.summarize_all(events, command=command)
+    
+    # Show summary
+    console.print(f"\n[bold]Summary ({len(events)} events):[/bold]")
+    console.print(summary)
 
 
 @cli.command()
