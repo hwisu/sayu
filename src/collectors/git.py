@@ -19,6 +19,7 @@ class GitCollector(Collector):
         self.last_commit_hash = None
         self.last_branch = None
         self.commit_range = commit_range  # e.g., "HEAD~1..HEAD", "abc123..def456"
+        self.seen_commit_hashes = set()  # Track already processed commits to avoid duplicates
     
     @property
     def name(self) -> str:
@@ -29,34 +30,53 @@ class GitCollector(Collector):
         """Collect Git events since the given timestamp."""
         if not self.git_dir.exists():
             return []
-        
+
         # Make since timezone-naive if it's timezone-aware
         if since and since.tzinfo is not None:
             since = since.replace(tzinfo=None)
-        
+
         events = []
-        
+        processed_hashes = set()  # Track commits processed in this collection
+
         # Get current branch
         current_branch = self._get_current_branch()
         if current_branch and current_branch != self.last_branch:
             events.append(self._create_branch_event(current_branch))
             self.last_branch = current_branch
-        
+
         # Get recent commits
         commits = self._get_recent_commits(since)
         for commit in commits:
+            # Skip if we've already processed this commit
+            if commit['hash'] in self.seen_commit_hashes or commit['hash'] in processed_hashes:
+                continue
+
+            # Skip auto-generated summary commits
+            if 'Collecting events since last commit' in commit['message']:
+                continue
+
             events.append(self._create_commit_event(commit))
-        
+            processed_hashes.add(commit['hash'])
+
         # Get recent checkouts (from reflog)
         checkouts = self._get_recent_checkouts(since)
         for checkout in checkouts:
+            # Skip if this is a duplicate checkout for same hash
+            if checkout['hash'] in processed_hashes:
+                continue
             events.append(self._create_checkout_event(checkout))
-        
-        # Get recent merges
+            processed_hashes.add(checkout['hash'])
+
+        # Get recent merges (skip if already in commits)
         merges = self._get_recent_merges(since)
         for merge in merges:
-            events.append(self._create_merge_event(merge))
-        
+            if merge['hash'] not in processed_hashes:
+                events.append(self._create_merge_event(merge))
+                processed_hashes.add(merge['hash'])
+
+        # Update seen commits for next collection
+        self.seen_commit_hashes.update(processed_hashes)
+
         return events
     
     def setup(self) -> None:

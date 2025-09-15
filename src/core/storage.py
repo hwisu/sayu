@@ -53,21 +53,32 @@ class Storage:
             ))
     
     def add_events(self, events: List[Event]) -> None:
-        """Add multiple events to storage."""
+        """Add multiple events to storage, avoiding duplicates."""
         with sqlite3.connect(self.db_path) as conn:
-            conn.executemany("""
-                INSERT INTO events (timestamp, type, source, content, metadata)
-                VALUES (?, ?, ?, ?, ?)
-            """, [
-                (
+            # Check for existing events to avoid duplicates
+            for event in events:
+                # Check if this exact event already exists
+                cursor = conn.execute("""
+                    SELECT COUNT(*) FROM events
+                    WHERE timestamp = ? AND source = ? AND content = ?
+                """, (
                     event.timestamp.isoformat(),
-                    event.type.value,
                     event.source,
-                    event.content,
-                    json.dumps(event.metadata)
-                )
-                for event in events
-            ])
+                    event.content
+                ))
+
+                if cursor.fetchone()[0] == 0:
+                    # Event doesn't exist, add it
+                    conn.execute("""
+                        INSERT INTO events (timestamp, type, source, content, metadata)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (
+                        event.timestamp.isoformat(),
+                        event.type.value,
+                        event.source,
+                        event.content,
+                        json.dumps(event.metadata)
+                    ))
     
     def get_events(
         self,

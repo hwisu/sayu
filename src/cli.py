@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+import subprocess
 from .config import Config
 from .core import Storage
 from .collectors import ClaudeCodeCollector, GitCollector
@@ -122,27 +123,67 @@ def summarize(hours: int, engine: str, last: int, since_commit: bool):
     config = Config()
     storage = Storage(config.db_path)
     visualizer = TimelineVisualizer()
-    
+
     # Get timeframe
     timeframe_hours = hours or config.timeframe_hours
     timeframe = timedelta(hours=timeframe_hours)
-    
+
     # Get events - default to since last commit
     if since_commit and not last:
         git_collector = GitCollector()
-        last_commit_time = git_collector._get_last_commit_time()
-        if last_commit_time:
-            since = last_commit_time
-            console.print(f"[dim]Summarizing events since last commit: {since.strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
-        else:
-            console.print("[yellow]No commits found, using last 24 hours[/yellow]")
+
+        # Get the last two commits to find the range
+        try:
+            result = subprocess.run(
+                ["git", "log", "--pretty=format:%H|%ad", "--date=iso", "-2"],
+                cwd=Path.cwd(),
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                lines = result.stdout.strip().split('\n')
+                if len(lines) >= 2:
+                    # Get time of second-to-last commit
+                    second_commit_parts = lines[1].split('|')
+                    if len(second_commit_parts) >= 2:
+                        date_str = second_commit_parts[1]
+                        if '+' in date_str:
+                            date_str = date_str.split('+')[0].strip()
+                        if ' ' in date_str:
+                            date_str = date_str.replace(' ', 'T')
+                        since = datetime.fromisoformat(date_str)
+                        console.print(f"[dim]Summarizing events between last two commits (since {since.strftime('%Y-%m-%d %H:%M:%S')})[/dim]")
+                    else:
+                        # Fallback to last commit time
+                        last_commit_time = git_collector._get_last_commit_time()
+                        if last_commit_time:
+                            since = last_commit_time
+                            console.print(f"[dim]Summarizing events since last commit: {since.strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
+                        else:
+                            console.print("[yellow]No commits found, using last 24 hours[/yellow]")
+                            since = datetime.now() - timedelta(hours=24)
+                else:
+                    # Only one commit, use its time
+                    last_commit_time = git_collector._get_last_commit_time()
+                    if last_commit_time:
+                        since = last_commit_time
+                        console.print(f"[dim]Summarizing events since last commit: {since.strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
+                    else:
+                        console.print("[yellow]No commits found, using last 24 hours[/yellow]")
+                        since = datetime.now() - timedelta(hours=24)
+            else:
+                console.print("[yellow]No commits found, using last 24 hours[/yellow]")
+                since = datetime.now() - timedelta(hours=24)
+        except:
+            console.print("[yellow]Error getting commit history, using last 24 hours[/yellow]")
             since = datetime.now() - timedelta(hours=24)
     else:
         # Use time-based approach
         hours_back = last or 24
         since = datetime.now() - timedelta(hours=hours_back)
         console.print(f"[dim]Summarizing events from last {hours_back} hours[/dim]")
-    
+
     events = storage.get_events(since=since)
     
     if not events:
