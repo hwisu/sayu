@@ -32,7 +32,7 @@ def init():
     # Create config file
     config.data = {
         "db_path": str(Path.home() / ".sayu" / "events.db"),
-        "default_provider": "gemini",
+        "default_provider": "openrouter",
         "timeframe_hours": 2,
         "collectors": {
             "claude-code": {

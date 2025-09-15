@@ -1,10 +1,12 @@
 """Summarization engine using external LLM commands."""
 
+import os
 import subprocess
 from datetime import timedelta
 from typing import List, Optional, Dict, Any
 from enum import Enum
 
+from openai import OpenAI
 from ..core import Event
 
 
@@ -12,15 +14,25 @@ class LLMProvider(Enum):
     """Supported LLM providers."""
     CLAUDE = "claude"
     GEMINI = "gemini"
+    OPENROUTER = "openrouter"
     CUSTOM = "custom"
 
 
 class Summarizer:
     """Summarize events using external LLM commands."""
     
-    def __init__(self, provider: LLMProvider = LLMProvider.CLAUDE):
+    def __init__(self, provider: LLMProvider = LLMProvider.OPENROUTER):
         """Initialize summarizer with LLM provider."""
         self.provider = provider
+        self.openrouter_client = None
+        
+        if provider == LLMProvider.OPENROUTER:
+            api_key = os.getenv("SAYU_OPENROUTER_API_KEY")
+            if api_key:
+                self.openrouter_client = OpenAI(
+                    base_url="https://openrouter.ai/api/v1",
+                    api_key=api_key,
+                )
     
     def summarize_timeframe(
         self,
@@ -118,7 +130,11 @@ class Summarizer:
         # Prepare context
         context = self._prepare_context(events)
         
-        # Build command
+        # Use OpenRouter if configured
+        if self.provider == LLMProvider.OPENROUTER and self.openrouter_client:
+            return self._summarize_with_openrouter(context)
+        
+        # Build command for CLI-based providers
         if command:
             cmd = command.replace("{context}", context)
         else:
@@ -164,6 +180,36 @@ class Summarizer:
         
         return "\\n".join(lines)
     
+    def _summarize_with_openrouter(self, context: str) -> str:
+        """Summarize using OpenRouter API."""
+        try:
+            model = os.getenv("SAYU_LLM_MODEL", "openai/gpt-4o-mini")
+            
+            completion = self.openrouter_client.chat.completions.create(
+                extra_headers={
+                    "HTTP-Referer": "https://github.com/hwisu/sayu",
+                    "X-Title": "Sayu - AI Conversation Tracker",
+                },
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that summarizes work sessions. Provide concise, clear summaries focusing on what was accomplished."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Summarize this work session:\n\n{context}"
+                    }
+                ],
+                max_tokens=500,
+                temperature=0.7,
+            )
+            
+            return completion.choices[0].message.content
+            
+        except Exception as e:
+            return f"Error using OpenRouter: {str(e)}"
+    
     def _get_default_command(self, context: str) -> str:
         """Get default command for provider."""
         # Escape single quotes in context
@@ -173,5 +219,7 @@ class Summarizer:
             return f"claude -c 'Summarize this work session:\\n{escaped_context}'"
         elif self.provider == LLMProvider.GEMINI:
             return f"gemini -p 'Summarize this work session:\\n{escaped_context}'"
+        elif self.provider == LLMProvider.OPENROUTER:
+            return "echo 'OpenRouter provider requires API key'"
         else:
             return f"echo 'No default command for {self.provider}'"

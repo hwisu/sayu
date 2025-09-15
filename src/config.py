@@ -35,7 +35,7 @@ class Config:
     @property
     def default_provider(self) -> str:
         """Get default LLM provider."""
-        return self.data.get("default_provider", "claude")
+        return self.data.get("default_provider", "openrouter")
     
     @property
     def timeframe_hours(self) -> int:

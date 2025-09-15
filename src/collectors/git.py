@@ -395,29 +395,65 @@ class GitCollector(Collector):
     
     def _create_post_commit_hook(self, hooks_dir: Path) -> None:
         """Create post-commit hook."""
-        hook_content = '''#!/bin/sh
+        # Try to find sayu in PATH or use pipx default location
+        import shutil
+        sayu_path = shutil.which('sayu')
+        if not sayu_path:
+            # Use pipx default location
+            home = Path.home()
+            sayu_path = home / '.local' / 'bin' / 'sayu'
+            if not sayu_path.exists():
+                sayu_path = 'sayu'  # Fallback to PATH
+            else:
+                sayu_path = str(sayu_path)
+
+        hook_content = f'''#!/bin/sh
 # Sayu Git post-commit hook
-sayu collect >/dev/null 2>&1 || true
+{sayu_path} collect >/dev/null 2>&1 || true
 '''
         hook_path = hooks_dir / "post-commit"
         hook_path.write_text(hook_content)
         hook_path.chmod(0o755)
-    
+
     def _create_post_checkout_hook(self, hooks_dir: Path) -> None:
         """Create post-checkout hook."""
-        hook_content = '''#!/bin/sh
+        # Try to find sayu in PATH or use pipx default location
+        import shutil
+        sayu_path = shutil.which('sayu')
+        if not sayu_path:
+            # Use pipx default location
+            home = Path.home()
+            sayu_path = home / '.local' / 'bin' / 'sayu'
+            if not sayu_path.exists():
+                sayu_path = 'sayu'  # Fallback to PATH
+            else:
+                sayu_path = str(sayu_path)
+
+        hook_content = f'''#!/bin/sh
 # Sayu Git post-checkout hook
-sayu collect >/dev/null 2>&1 || true
+{sayu_path} collect >/dev/null 2>&1 || true
 '''
         hook_path = hooks_dir / "post-checkout"
         hook_path.write_text(hook_content)
         hook_path.chmod(0o755)
-    
+
     def _create_post_merge_hook(self, hooks_dir: Path) -> None:
         """Create post-merge hook."""
-        hook_content = '''#!/bin/sh
+        # Try to find sayu in PATH or use pipx default location
+        import shutil
+        sayu_path = shutil.which('sayu')
+        if not sayu_path:
+            # Use pipx default location
+            home = Path.home()
+            sayu_path = home / '.local' / 'bin' / 'sayu'
+            if not sayu_path.exists():
+                sayu_path = 'sayu'  # Fallback to PATH
+            else:
+                sayu_path = str(sayu_path)
+
+        hook_content = f'''#!/bin/sh
 # Sayu Git post-merge hook
-sayu collect >/dev/null 2>&1 || true
+{sayu_path} collect >/dev/null 2>&1 || true
 '''
         hook_path = hooks_dir / "post-merge"
         hook_path.write_text(hook_content)

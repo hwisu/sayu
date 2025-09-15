@@ -4,5 +4,5 @@ collectors:
   git:
     enabled: true
 db_path: /Users/hwisookim/.sayu/events.db
-default_provider: gemini
+default_provider: openrouter
 timeframe_hours: 2
