@@ -208,10 +208,10 @@ class Summarizer:
                         },
                         {
                             "role": "user",
-                            "content": f"Summarize this session (max 3 tasks):\n\n{context[:2000]}"  # Limit context
+                            "content": f"Summarize this session (max 3 tasks):\n\n{context}"
                         }
                     ],
-                    max_tokens=500,
+                    max_tokens=500,  # Enough for git commit message
                     temperature=0.7,
                     response_format={"type": "json_object"}
                 )
@@ -258,21 +258,27 @@ class Summarizer:
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are a helpful assistant that summarizes work sessions. Provide concise, clear summaries focusing on what was accomplished."
+                            "content": "You are a helpful assistant that summarizes work sessions concisely. Focus on what was accomplished."
                         },
                         {
                             "role": "user",
-                            "content": f"Summarize this work session:\n\n{context}"
+                            "content": f"Create a brief summary (2-3 lines) for this work session:\n\n{context}"
                         }
                     ],
                     max_tokens=500,
                     temperature=0.7,
                 )
 
-                return completion.choices[0].message.content
+                if completion and completion.choices and len(completion.choices) > 0:
+                    result = completion.choices[0].message.content
+                    if result:
+                        return result
+
+                return "Summary generation failed"
 
         except Exception as e:
-            return f"Error using OpenRouter: {str(e)}"
+            import traceback
+            return f"Error using OpenRouter: {str(e)}\n{traceback.format_exc()}"
     
     def _get_default_command(self, context: str) -> str:
         """Get default command for provider."""

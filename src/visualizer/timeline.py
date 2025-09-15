@@ -80,33 +80,35 @@ class TimelineVisualizer:
     ) -> None:
         """
         Display summarized timeframes as a timeline.
-        
+
         Args:
             summaries: List of timeframe summaries
         """
         if not summaries:
             self.console.print("[yellow]No summaries to display[/yellow]")
             return
-        
-        # Create table
-        table = Table(title="Summary Timeline", show_header=True)
-        table.add_column("Timeframe", style="cyan", no_wrap=True)
-        table.add_column("Events", style="green", justify="right")
-        table.add_column("Summary", style="white")
-        
-        # Add summaries to table
+
+        # Display summaries without table for better formatting
+        self.console.print("\n[bold]Summary Timeline[/bold]\n")
+
         for summary in summaries:
-            start = summary["start"].strftime("%H:%M")
+            start = summary["start"].strftime("%Y-%m-%d %H:%M")
             end = summary["end"].strftime("%H:%M")
-            timeframe = f"{start} - {end}"
-            
-            table.add_row(
-                timeframe,
-                str(summary["event_count"]),
-                summary["summary"]
-            )
-        
-        self.console.print(table)
+
+            # Print timeframe header
+            self.console.print(f"[cyan]📅 {start} - {end}[/cyan] ([green]{summary['event_count']} events[/green])")
+
+            # Print summary with proper formatting
+            summary_text = summary["summary"]
+            # Remove any markdown backticks that might appear
+            summary_text = summary_text.replace("```", "").strip()
+
+            # Print summary with indentation
+            for line in summary_text.split('\n'):
+                if line.strip():
+                    self.console.print(f"  {line}")
+
+            self.console.print()  # Add blank line between summaries
     
     def show_stats(self, events: List[Event]) -> None:
         """Show statistics about events."""
