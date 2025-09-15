@@ -18,7 +18,7 @@ console = Console()
 
 
 @click.group()
-@click.version_option(version="1.0.0", prog_name="sayu")
+@click.version_option(version="1.1.0", prog_name="sayu")
 def cli():
     """AI conversation history tracker with timeline visualization."""
     pass
