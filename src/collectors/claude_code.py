@@ -263,10 +263,10 @@ def summarize_with_gemini(text, prompt_type="default", context=None):
                     content = response["candidates"][0]["content"]["parts"][0]["text"]
                     return content.strip()
                 elif "error" in response:
-                    with open("/Users/hwisookim/.sayu/hooks/debug.log", "a") as f:
+                    with open("$HOME/.sayu/hooks/debug.log", "a") as f:
                         f.write(f"Gemini API error: {{response.get('error')}}\\n")
         except Exception as e:
-            with open("/Users/hwisookim/.sayu/hooks/debug.log", "a") as f:
+            with open("$HOME/.sayu/hooks/debug.log", "a") as f:
                 f.write(f"Gemini summarization error: {{e}}\\n")
     
     # If Gemini fails, return original text with prefix
@@ -412,7 +412,7 @@ def create_manual_summary(text, context):
 
 def main():
     # Log execution
-    log_file = Path("/Users/hwisookim/.sayu/hooks/debug.log")
+    log_file = Path("$HOME/.sayu/hooks/debug.log")
     with open(log_file, "a") as f:
         f.write(f"\\n[{{datetime.now()}}] Hook script executed\\n")
     

@@ -30,7 +30,11 @@ class Config:
     @property
     def db_path(self) -> Path:
         """Get database path."""
-        return Path(self.data.get("db_path", Path.home() / ".sayu" / "events.db"))
+        db_path = self.data.get("db_path", str(Path.home() / ".sayu" / "events.db"))
+        # Expand environment variables
+        db_path = os.path.expandvars(db_path)
+        db_path = os.path.expanduser(db_path)
+        return Path(db_path)
     
     @property
     def default_provider(self) -> str:

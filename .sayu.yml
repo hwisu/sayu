@@ -3,6 +3,6 @@ collectors:
     enabled: true
   git:
     enabled: true
-db_path: /Users/hwisookim/.sayu/events.db
+db_path: $HOME/.sayu/events.db
 default_provider: openrouter
 timeframe_hours: 2
