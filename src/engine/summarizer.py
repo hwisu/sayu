@@ -38,16 +38,18 @@ class Summarizer:
         self,
         events: List[Event],
         timeframe: timedelta,
-        command: Optional[str] = None
+        command: Optional[str] = None,
+        structured: bool = False
     ) -> List[Dict[str, Any]]:
         """
         Summarize events within timeframes.
-        
+
         Args:
             events: List of events to summarize
             timeframe: Duration of each timeframe
             command: Custom command to use for summarization
-            
+            structured: Use structured output format if available
+
         Returns:
             List of summaries with timeframe info
         """
@@ -99,7 +101,8 @@ class Summarizer:
         for frame in timeframes:
             summary = self._summarize_events(
                 frame["events"],
-                command=command
+                command=command,
+                structured=structured
             )
             summaries.append({
                 "start": frame["start"],
@@ -113,26 +116,28 @@ class Summarizer:
     def summarize_all(
         self,
         events: List[Event],
-        command: Optional[str] = None
+        command: Optional[str] = None,
+        structured: bool = False
     ) -> str:
         """Summarize all events together."""
-        return self._summarize_events(events, command=command)
+        return self._summarize_events(events, command=command, structured=structured)
     
     def _summarize_events(
         self,
         events: List[Event],
-        command: Optional[str] = None
+        command: Optional[str] = None,
+        structured: bool = False
     ) -> str:
         """Summarize a list of events using LLM."""
         if not events:
             return "No events to summarize."
-        
+
         # Prepare context
         context = self._prepare_context(events)
-        
+
         # Use OpenRouter if configured
         if self.provider == LLMProvider.OPENROUTER and self.openrouter_client:
-            return self._summarize_with_openrouter(context)
+            return self._summarize_with_openrouter(context, structured=structured)
         
         # Build command for CLI-based providers
         if command:
@@ -180,33 +185,92 @@ class Summarizer:
         
         return "\\n".join(lines)
     
-    def _summarize_with_openrouter(self, context: str) -> str:
+    def _summarize_with_openrouter(self, context: str, structured: bool = False) -> str:
         """Summarize using OpenRouter API."""
         try:
             model = os.getenv("SAYU_LLM_MODEL", "openai/gpt-4o-mini")
-            
-            completion = self.openrouter_client.chat.completions.create(
-                extra_headers={
-                    "HTTP-Referer": "https://github.com/hwisu/sayu",
-                    "X-Title": "Sayu - AI Conversation Tracker",
-                },
-                model=model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a helpful assistant that summarizes work sessions. Provide concise, clear summaries focusing on what was accomplished."
+
+            # Check if we should use structured output
+            use_structured = structured and os.getenv("SAYU_STRUCTURED_OUTPUT", "false").lower() == "true"
+
+            if use_structured:
+                # Use structured output with simpler schema
+                completion = self.openrouter_client.chat.completions.create(
+                    extra_headers={
+                        "HTTP-Referer": "https://github.com/hwisu/sayu",
+                        "X-Title": "Sayu - AI Conversation Tracker",
                     },
-                    {
-                        "role": "user",
-                        "content": f"Summarize this work session:\n\n{context}"
-                    }
-                ],
-                max_tokens=500,
-                temperature=0.7,
-            )
-            
-            return completion.choices[0].message.content
-            
+                    model=model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "Summarize work sessions in JSON format with: title (brief), tasks (3 items max with ✅/🔄/❌ prefix), summary (2-3 sentences)."
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Summarize this session (max 3 tasks):\n\n{context[:2000]}"  # Limit context
+                        }
+                    ],
+                    max_tokens=500,
+                    temperature=0.7,
+                    response_format={"type": "json_object"}
+                )
+
+                # Get the response
+                import json
+                response_message = completion.choices[0].message
+
+                # Try to parse JSON from content if parsed is not available
+                if hasattr(response_message, 'parsed') and response_message.parsed:
+                    result = response_message.parsed
+                else:
+                    # Try to parse from content
+                    try:
+                        result = json.loads(response_message.content)
+                    except:
+                        # Return raw content if not JSON
+                        return response_message.content
+
+                # Format structured output as readable text
+                if result:
+                    lines = []
+                    lines.append(f"**{result.get('title', 'Session Summary')}**\n")
+
+                    if result.get('tasks'):
+                        lines.append("**Main Tasks:**")
+                        for task in result['tasks'][:3]:  # Limit to 3 tasks
+                            lines.append(f"  {task}")
+
+                    if result.get('summary'):
+                        lines.append(f"\n{result['summary']}")
+
+                    return "\n".join(lines)
+                else:
+                    return response_message.content
+            else:
+                # Regular unstructured output
+                completion = self.openrouter_client.chat.completions.create(
+                    extra_headers={
+                        "HTTP-Referer": "https://github.com/hwisu/sayu",
+                        "X-Title": "Sayu - AI Conversation Tracker",
+                    },
+                    model=model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a helpful assistant that summarizes work sessions. Provide concise, clear summaries focusing on what was accomplished."
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Summarize this work session:\n\n{context}"
+                        }
+                    ],
+                    max_tokens=500,
+                    temperature=0.7,
+                )
+
+                return completion.choices[0].message.content
+
         except Exception as e:
             return f"Error using OpenRouter: {str(e)}"
     

@@ -118,7 +118,8 @@ def timeline(last: int, source: str, verbose: bool):
 @click.option("-e", "--engine", help="LLM engine command")
 @click.option("--last", type=int, help="Look back N hours (default: since last commit)")
 @click.option("--since-commit", is_flag=True, default=True, help="Use last commit as reference point")
-def summarize(hours: int, engine: str, last: int, since_commit: bool):
+@click.option("--structured", is_flag=True, help="Use structured output format (requires SAYU_STRUCTURED_OUTPUT=true)")
+def summarize(hours: int, engine: str, last: int, since_commit: bool, structured: bool):
     """Summarize events within timeframes."""
     config = Config()
     storage = Storage(config.db_path)
@@ -204,7 +205,8 @@ def summarize(hours: int, engine: str, last: int, since_commit: bool):
         summaries = summarizer.summarize_timeframe(
             events,
             timeframe,
-            command=command
+            command=command,
+            structured=structured
         )
     
     # Show results
