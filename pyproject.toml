@@ -29,10 +29,10 @@ dev = [
 ]
 
 [project.scripts]
-sayu = "sayu.cli:main"
+sayu = "src.cli:main"
 
 [tool.setuptools]
-packages = ["sayu", "sayu.core", "sayu.collectors", "sayu.engine", "sayu.visualizer"]
+packages = ["src", "src.core", "src.collectors", "src.engine", "src.visualizer"]
 
 [tool.black]
 line-length = 88

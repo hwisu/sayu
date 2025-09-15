@@ -1,7 +1,7 @@
 """Summarization engine using external LLM commands."""
 
 import subprocess
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import List, Optional, Dict, Any
 from enum import Enum
 

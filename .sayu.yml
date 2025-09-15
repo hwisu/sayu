@@ -1,11 +1,8 @@
-# Sayu Configuration
-# 커밋에 '왜'를 남기는 개인 로컬 블랙박스
-
-language: ko              # 언어 설정 (ko, en)
-commitTrailer: true       # 커밋 메시지에 AI 분석 추가
-
-connectors:
-  claude: true            # Claude Desktop 대화 수집
-  cursor: true            # Cursor 편집기 대화 수집
-  cli:
-    mode: "zsh-preexec"   # CLI 명령어 수집 (또는 "off")
+collectors:
+  claude-code:
+    enabled: true
+  git:
+    enabled: true
+db_path: /Users/hwisookim/.sayu/events.db
+default_provider: gemini
+timeframe_hours: 2

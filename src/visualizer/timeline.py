@@ -1,7 +1,6 @@
 """Timeline visualization for events."""
 
-from datetime import datetime
-from typing import List, Optional
+from typing import List
 
 from rich.console import Console
 from rich.table import Table

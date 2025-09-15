@@ -1,107 +1,90 @@
-# Sayu
+# Sayu (Python Version)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+AI conversation history tracker with timeline visualization.
 
-Automatically capture context from AI conversations and add it to your git commits.
+## Features
+
+- **Claude Code Integration**: Automatically captures conversations via hooks
+- **Timeline Visualization**: See your AI interactions over time
+- **Timeframe Summarization**: Summarize work sessions using external LLMs
+- **Extensible Architecture**: Easy to add new collectors via adapter pattern
+
+## Installation
+
+```bash
+# Install in development mode
+pip install -e .
+
+# Or install normally
+pip install .
+```
 
 ## Quick Start
 
 ```bash
-# Build from source
-cargo build --release
-
-# Install globally
-cargo install --path .
-
-# Initialize in your repo
+# Initialize in your project
 sayu init
 
-# Set API key (choose one)
-export SAYU_GEMINI_API_KEY=your_key
+# Your Claude Code conversations are now being tracked!
 
-# Or use OpenRouter (recommended for better model access)
-export SAYU_OPENROUTER_API_KEY=your_key
-export SAYU_LLM_MODEL=anthropic/claude-3.5-haiku  # Optional: specify model
+# View recent events
+sayu timeline -n 20
 
-# Commit normally
-git commit -m "Fix bug"
+# Summarize last 8 hours in 2-hour chunks
+sayu summarize --hours 2 --last 8
+
+# Watch for new events in real-time
+sayu watch
+
+# Show statistics
+sayu stats
 ```
-
-Your commits will automatically include AI-analyzed context.
-
-## Features
-
-- Collects conversations from Cursor, Claude Desktop, and shell commands
-- Automatically adds AI-generated context to commits
-- Hash-based deduplication prevents duplicate events
-- Time-range aware collection (only events since last commit)
-- Processes everything locally
-- Never blocks commits on errors
-- Written in Rust for performance
 
 ## Commands
 
-```bash
-sayu --version       # Show version
-sayu health          # Check system status
-sayu init            # Initialize in repository
-sayu list -n 20      # List recent events
-sayu list --collect  # Collect fresh events before listing
-sayu commit <hash>   # Show context for specific commit
-sayu show -n 5       # Show recent commit context
-sayu uninstall       # Remove from repository
-
-# Pipe to other tools for analysis
-sayu commit <hash> | gpt -c "Summarize this commit's context"
-sayu list -v | gpt -c "What was I working on?"
-```
+- `sayu init` - Set up Sayu in current directory
+- `sayu collect` - Manually collect new events
+- `sayu timeline` - Show event timeline
+- `sayu summarize` - Summarize events by timeframe
+- `sayu watch` - Watch for new events in real-time
+- `sayu stats` - Show event statistics
+- `sayu clean` - Remove Sayu from project
 
 ## Configuration
 
-`.sayu.yml` (only language is configurable):
+`.sayu.yml`:
 ```yaml
-language: ko    # or en
+db_path: ~/.sayu/events.db
+default_provider: claude
+timeframe_hours: 2
+collectors:
+  claude-code:
+    enabled: true
 ```
 
-The following settings are now hardcoded defaults:
-- `enabled`: always true
-- `commitTrailer`: always true
-- All connectors: always enabled
+## Extending with New Collectors
 
-Environment variables:
-```bash
-SAYU_LANG=en                    # Override language
-SAYU_DEBUG=true                 # Debug mode
+Create a new collector by extending the `Collector` base class:
 
-# LLM Configuration
-SAYU_OPENROUTER_API_KEY=key     # OpenRouter API key (recommended)
-SAYU_GEMINI_API_KEY=key         # Google Gemini API key
-SAYU_LLM_MODEL=model_name       # Model to use (default: anthropic/claude-3.5-haiku)
-SAYU_LLM_TEMPERATURE=0.7        # Creativity level (0.0-1.0)
-SAYU_LLM_MAX_TOKENS=1000        # Maximum tokens
-```
+```python
+from sayu.core import Collector, Event, EventType
 
-Popular OpenRouter models:
-- `anthropic/claude-3.5-haiku` - Fast and cost-effective
-- `anthropic/claude-3.5-sonnet` - Balanced performance
-- `openai/gpt-4o-mini` - Fast and cheap
-- `meta-llama/llama-3.1-8b-instruct` - Open source
-
-## Building
-
-```bash
-# Development build
-cargo build
-
-# Release build (optimized)
-cargo build --release
-
-# Run tests
-cargo test
-
-# Install locally
-cargo install --path .
+class MyCollector(Collector):
+    @property
+    def name(self):
+        return "my-source"
+    
+    def setup(self):
+        # Set up hooks or watchers
+        pass
+    
+    def teardown(self):
+        # Clean up
+        pass
+    
+    def collect(self, since=None):
+        # Return list of Event objects
+        return []
 ```
 
 ## License

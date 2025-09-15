@@ -9,7 +9,7 @@ from rich.console import Console
 
 from .config import Config
 from .core import Storage
-from .collectors import ClaudeCodeCollector
+from .collectors import ClaudeCodeCollector, GitCollector
 from .engine import Summarizer, LLMProvider
 from .visualizer import TimelineVisualizer
 
@@ -32,10 +32,13 @@ def init():
     # Create config file
     config.data = {
         "db_path": str(Path.home() / ".sayu" / "events.db"),
-        "default_provider": "claude",
+        "default_provider": "gemini",
         "timeframe_hours": 2,
         "collectors": {
             "claude-code": {
+                "enabled": True
+            },
+            "git": {
                 "enabled": True
             }
         }
@@ -43,8 +46,11 @@ def init():
     config.save()
     
     # Set up collectors
-    collector = ClaudeCodeCollector()
-    collector.setup()
+    claude_collector = ClaudeCodeCollector()
+    claude_collector.setup()
+    
+    git_collector = GitCollector()
+    git_collector.setup()
     
     console.print("[green]✓[/green] Initialized Sayu")
     console.print(f"[dim]Config: {config.config_path}[/dim]")
@@ -70,6 +76,14 @@ def collect():
             storage.add_events(events)
             total_events += len(events)
             console.print(f"[green]✓[/green] Collected {len(events)} events from claude-code")
+    
+    if config.get_collector_config("git").get("enabled", True):
+        git_collector = GitCollector()
+        events = git_collector.collect(since=latest)
+        if events:
+            storage.add_events(events)
+            total_events += len(events)
+            console.print(f"[green]✓[/green] Collected {len(events)} events from git")
     
     if total_events == 0:
         console.print("[yellow]No new events collected[/yellow]")
@@ -195,13 +209,41 @@ def stats():
 
 
 @cli.command()
+def git_hook():
+    """Set up git hooks for automatic commit integration."""
+    config = Config()
+    
+    # Create post-commit hook
+    git_dir = Path(".git")
+    if not git_dir.exists():
+        console.print("[red]Not a git repository[/red]")
+        return
+    
+    hooks_dir = git_dir / "hooks"
+    hooks_dir.mkdir(exist_ok=True)
+    
+    post_commit_hook = hooks_dir / "post-commit"
+    post_commit_hook.write_text('''#!/bin/sh
+# Sayu post-commit hook
+sayu collect >/dev/null 2>&1 || true
+''')
+    post_commit_hook.chmod(0o755)
+    
+    console.print("[green]✓[/green] Git hooks installed")
+    console.print("[dim]Will auto-collect events after each commit[/dim]")
+
+
+@cli.command()
 def clean():
     """Remove Sayu from the current directory."""
     config = Config()
     
     # Remove collector hooks
-    collector = ClaudeCodeCollector()
-    collector.teardown()
+    claude_collector = ClaudeCodeCollector()
+    claude_collector.teardown()
+    
+    git_collector = GitCollector()
+    git_collector.teardown()
     
     # Remove config
     if config.config_path.exists():
