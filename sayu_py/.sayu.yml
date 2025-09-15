@@ -1,0 +1,6 @@
+collectors:
+  claude-code:
+    enabled: true
+db_path: /Users/hwisookim/.sayu/events.db
+default_provider: claude
+timeframe_hours: 2
