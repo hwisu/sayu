@@ -100,17 +100,26 @@ class ClaudeCodeCollector(Collector):
         """Collect events from Claude Code hooks."""
         if not self.event_file.exists():
             return []
-        
+
+        # Get current working directory to filter events
+        current_cwd = str(Path.cwd().resolve())
+
         events = []
         with open(self.event_file, "r") as f:
             for line in f:
                 if not line.strip():
                     continue
-                
+
                 try:
                     data = json.loads(line)
+
+                    # Skip events from other repositories/directories
+                    event_cwd = data.get("metadata", {}).get("cwd", "")
+                    if event_cwd and event_cwd != current_cwd:
+                        continue
+
                     timestamp = datetime.fromisoformat(data["timestamp"])
-                    
+
                     if since and timestamp <= since:
                         continue
                     
@@ -263,10 +272,12 @@ def summarize_with_gemini(text, prompt_type="default", context=None):
                     content = response["candidates"][0]["content"]["parts"][0]["text"]
                     return content.strip()
                 elif "error" in response:
-                    with open("$HOME/.sayu/hooks/debug.log", "a") as f:
+                    debug_log = Path.home() / ".sayu" / "hooks" / "debug.log"
+                    with open(debug_log, "a") as f:
                         f.write(f"Gemini API error: {{response.get('error')}}\\n")
         except Exception as e:
-            with open("$HOME/.sayu/hooks/debug.log", "a") as f:
+            debug_log = Path.home() / ".sayu" / "hooks" / "debug.log"
+            with open(debug_log, "a") as f:
                 f.write(f"Gemini summarization error: {{e}}\\n")
     
     # If Gemini fails, return original text with prefix
@@ -412,7 +423,8 @@ def create_manual_summary(text, context):
 
 def main():
     # Log execution
-    log_file = Path("$HOME/.sayu/hooks/debug.log")
+    log_file = Path.home() / ".sayu" / "hooks" / "debug.log"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
     with open(log_file, "a") as f:
         f.write(f"\\n[{{datetime.now()}}] Hook script executed\\n")
     
@@ -687,6 +699,9 @@ def main():
         content = f"Unknown event: {{hook_event}}"
         metadata = {{"type": "unknown", "hook": hook_event}}
     
+    # Add cwd to metadata for filtering
+    metadata["cwd"] = hook_data.get("cwd", "")
+
     # Create final event in sayu format
     sayu_event = {{
         "timestamp": datetime.now().isoformat(),

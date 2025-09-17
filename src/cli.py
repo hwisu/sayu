@@ -213,31 +213,43 @@ def summarize(hours: int, engine: str, last: int, since_commit: bool, structured
     visualizer.show_summary_timeline(summaries)
 
 
-@cli.command()
+@cli.command(name='summarize-since-last-commit')
 @click.option("-e", "--engine", help="LLM engine command")
 def summarize_since_last_commit(engine: str):
     """Summarize events since the last commit."""
+    _summarize_since_last_commit_impl(engine)
+
+
+@cli.command(name='sslc')
+@click.option("-e", "--engine", help="LLM engine command")
+def sslc(engine: str):
+    """Summarize events since the last commit (short alias)."""
+    _summarize_since_last_commit_impl(engine)
+
+
+def _summarize_since_last_commit_impl(engine: str):
+    """Implementation for summarize-since-last-commit."""
     config = Config()
     storage = Storage(config.db_path)
     visualizer = TimelineVisualizer()
-    
+
     # Get last commit time
     git_collector = GitCollector()
     last_commit_time = git_collector._get_last_commit_time()
-    
+
     if not last_commit_time:
         console.print("[yellow]No commits found in this repository[/yellow]")
         return
-    
+
     console.print(f"[dim]Collecting events since last commit: {last_commit_time.strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
-    
+
     # Get events since last commit
     events = storage.get_events(since=last_commit_time)
-    
+
     if not events:
         console.print("[yellow]No events found since last commit[/yellow]")
         return
-    
+
     # Create summarizer
     if engine:
         summarizer = Summarizer(LLMProvider.CUSTOM)
@@ -246,11 +258,11 @@ def summarize_since_last_commit(engine: str):
         provider = LLMProvider(config.default_provider)
         summarizer = Summarizer(provider)
         command = None
-    
+
     # Summarize all events since last commit
     with console.status("[bold green]Summarizing events since last commit..."):
         summary = summarizer.summarize_all(events, command=command)
-    
+
     # Show results
     console.print(f"\n[bold]Summary since last commit ({len(events)} events):[/bold]")
     console.print(summary)
