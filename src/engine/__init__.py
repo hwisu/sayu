@@ -1,5 +1,5 @@
 """Summarization engine for events."""
 
-from .summarizer import Summarizer, LLMProvider
+from .summarizer import LLMProvider, Summarizer
 
 __all__ = ["Summarizer", "LLMProvider"]

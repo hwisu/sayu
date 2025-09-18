@@ -3,38 +3,37 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 from ..core import Collector, Event, EventType
 
 
 class ClaudeCodeCollector(Collector):
     """Collector for Claude Code conversations via hooks."""
-    
-    def __init__(self, hook_dir: Optional[Path] = None):
+
+    def __init__(self, hook_dir: Path | None = None):
         """
         Initialize collector.
-        
+
         Args:
             hook_dir: Directory to store hook scripts
         """
         self.hook_dir = hook_dir or Path.home() / ".sayu" / "hooks"
         self.event_file = self.hook_dir / "events.jsonl"
-        
+
     def setup(self) -> None:
         """Set up Claude Code hooks."""
         self.hook_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Create hook script
         hook_script = self.hook_dir / "claude_code_hook.py"
         hook_script.write_text(self._get_hook_script())
         hook_script.chmod(0o755)
-        
+
         # Create .claude/settings.json in home directory for user-level hooks
         settings_dir = Path.home() / ".claude"
         settings_dir.mkdir(exist_ok=True)
         settings_path = settings_dir / "settings.json"
-        
+
         # Define all 9 Claude Code event types
         event_types = [
             "PreToolUse",
@@ -45,34 +44,29 @@ class ClaudeCodeCollector(Collector):
             "PreCompact",
             "SessionStart",
             "SessionEnd",
-            "Notification"
+            "Notification",
         ]
-        
+
         # Create hook configuration for all event types
         hooks_config = {}
         for event_type in event_types:
             hooks_config[event_type] = [
                 {
                     "matcher": "*",
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": str(hook_script)
-                        }
-                    ]
+                    "hooks": [{"type": "command", "command": str(hook_script)}],
                 }
             ]
-        
+
         settings = {"hooks": hooks_config}
-        
+
         if settings_path.exists():
             # Merge with existing settings
             existing = json.loads(settings_path.read_text())
             existing.setdefault("hooks", {}).update(settings["hooks"])
             settings = existing
-        
+
         settings_path.write_text(json.dumps(settings, indent=2))
-        
+
     def teardown(self) -> None:
         """Remove Claude Code hooks."""
         settings_path = Path.home() / ".claude" / "settings.json"
@@ -81,22 +75,28 @@ class ClaudeCodeCollector(Collector):
             if "hooks" in settings:
                 # Remove all event types
                 event_types = [
-                    "PreToolUse", "PostToolUse", "UserPromptSubmit",
-                    "Stop", "SubagentStop", "PreCompact",
-                    "SessionStart", "SessionEnd", "Notification"
+                    "PreToolUse",
+                    "PostToolUse",
+                    "UserPromptSubmit",
+                    "Stop",
+                    "SubagentStop",
+                    "PreCompact",
+                    "SessionStart",
+                    "SessionEnd",
+                    "Notification",
                 ]
                 for event_type in event_types:
                     settings["hooks"].pop(event_type, None)
-                
+
                 if not settings["hooks"]:
                     del settings["hooks"]
-            
+
             if settings:
                 settings_path.write_text(json.dumps(settings, indent=2))
             else:
                 settings_path.unlink()
-    
-    def collect(self, since: Optional[datetime] = None) -> List[Event]:
+
+    def collect(self, since: datetime | None = None) -> list[Event]:
         """Collect events from Claude Code hooks."""
         if not self.event_file.exists():
             return []
@@ -105,7 +105,7 @@ class ClaudeCodeCollector(Collector):
         current_cwd = str(Path.cwd().resolve())
 
         events = []
-        with open(self.event_file, "r") as f:
+        with open(self.event_file) as f:
             for line in f:
                 if not line.strip():
                     continue
@@ -122,16 +122,16 @@ class ClaudeCodeCollector(Collector):
 
                     if since and timestamp <= since:
                         continue
-                    
+
                     # Map metadata type to EventType
                     metadata = data.get("metadata", {})
                     meta_type = metadata.get("type", "")
-                    
+
                     # Determine event type based on metadata
                     if meta_type == "user_request":
                         event_type = EventType.CONVERSATION
                     elif meta_type == "assistant":
-                        event_type = EventType.CONVERSATION  
+                        event_type = EventType.CONVERSATION
                     elif meta_type == "tool_use":
                         tool = metadata.get("tool", "")
                         if tool in ["Edit", "Write", "MultiEdit"]:
@@ -142,26 +142,26 @@ class ClaudeCodeCollector(Collector):
                             event_type = EventType.ACTION
                     else:
                         event_type = EventType.ACTION
-                    
+
                     event = Event(
                         timestamp=timestamp,
                         type=event_type,
                         source=self.name,
                         content=data["content"],
-                        metadata=metadata
+                        metadata=metadata,
                     )
                     events.append(event)
                 except Exception as e:
                     print(f"Error parsing event: {e}")
                     continue
-        
+
         return events
-    
+
     @property
     def name(self) -> str:
         """Return collector name."""
         return "claude-code"
-    
+
     def _get_hook_script(self) -> str:
         """Generate hook script content."""
         return f'''#!/usr/bin/env python3
@@ -178,14 +178,14 @@ def summarize_with_gemini(text, prompt_type="default", context=None):
     """Summarize text using Gemini API."""
     if not text:
         return text
-    
+
     # Always try to summarize, even for short text
     # Create more specific prompts based on context
     if context and context.get("tool_name"):
         tool = context["tool_name"]
         if tool == "Bash":
             command = context.get("command", text)
-            prompt = f"""다음 bash 명령어가 수행하는 작업을 한국어로 구체적으로 설명해주세요. 
+            prompt = f"""다음 bash 명령어가 수행하는 작업을 한국어로 구체적으로 설명해주세요.
 명령어의 목적, 대상, 예상 결과를 포함해서 설명하되, 2-3문장으로 작성해주세요:
 명령어: {{command[:500]}}
 응답 형식: [목적] ... [대상] ... [결과] ..."""
@@ -233,7 +233,7 @@ def summarize_with_gemini(text, prompt_type="default", context=None):
 내용: """
         }}
         prompt = prompts.get(prompt_type, prompts["default"]) + text[:500]
-    
+
     # Try Gemini 2.0-flash API
     gemini_api_key = os.environ.get("SAYU_GEMINI_API_KEY", "")
     if gemini_api_key:
@@ -249,7 +249,7 @@ def summarize_with_gemini(text, prompt_type="default", context=None):
                     "maxOutputTokens": 200
                 }}
             }}
-            
+
             # Call Gemini API using curl with 2.0-flash model
             cmd = [
                 "curl", "-s",
@@ -258,14 +258,14 @@ def summarize_with_gemini(text, prompt_type="default", context=None):
                 "-H", "Content-Type: application/json",
                 "-d", json_module.dumps(payload)
             ]
-            
+
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 timeout=10
             )
-            
+
             if result.returncode == 0 and result.stdout:
                 response = json_module.loads(result.stdout)
                 if "candidates" in response and response["candidates"]:
@@ -279,13 +279,13 @@ def summarize_with_gemini(text, prompt_type="default", context=None):
             debug_log = Path.home() / ".sayu" / "hooks" / "debug.log"
             with open(debug_log, "a") as f:
                 f.write(f"Gemini summarization error: {{e}}\\n")
-    
+
     # If Gemini fails, return original text with prefix
     # This preserves the original content for later processing
     if context and context.get("tool_name"):
         prefix = get_tool_prefix(context.get("tool_name"))
         return f"{{prefix}} {{text[:200]}}..." if len(text) > 200 else f"{{prefix}} {{text}}"
-    
+
     return text[:200] + "..." if len(text) > 200 else text
 
 def get_tool_prefix(tool_name):
@@ -308,7 +308,7 @@ def get_tool_prefix(tool_name):
 def create_manual_summary(text, context):
     """Create manual summary when Gemini is not available."""
     tool = context.get("tool_name", "")
-    
+
     if tool == "Bash":
         command = context.get("command", text)
         if "git" in command:
@@ -353,12 +353,12 @@ def create_manual_summary(text, context):
             pattern = command.split()[1] if len(command.split()) > 1 else "패턴"
             return f"{{pattern}} 패턴을 검색합니다. 파일 내용에서 특정 텍스트나 패턴을 찾아 코드의 위치를 파악하고 분석합니다."
         return f"명령을 실행합니다: {{command[:50]}}. 시스템 작업을 수행하여 필요한 결과를 얻거나 환경을 설정합니다."
-    
+
     elif tool == "Edit":
         file_name = Path(context.get("file_path", "")).name
         old_str = context.get("old_string", "")
         new_str = context.get("new_string", "")
-        
+
         if "def " in old_str or "def " in new_str:
             func_name = old_str.split("def ")[-1].split("(")[0] if "def " in old_str else new_str.split("def ")[-1].split("(")[0]
             return f"{{file_name}} 파일의 {{func_name}} 함수를 수정합니다. 함수의 로직을 개선하거나 새로운 기능을 추가하여 코드의 동작을 변경합니다."
@@ -372,7 +372,7 @@ def create_manual_summary(text, context):
         elif "prompt" in old_str.lower() or "prompt" in new_str.lower():
             return f"{{file_name}} 파일의 프롬프트를 개선합니다. 더 명확하고 상세한 지시사항을 제공하여 AI의 응답 품질을 향상시킵니다."
         return f"{{file_name}} 파일을 수정합니다. 코드나 설정을 변경하여 기능을 개선하거나 버그를 수정합니다."
-    
+
     elif tool == "Read":
         file_name = Path(context.get("file_path", "")).name
         if "README" in file_name:
@@ -388,37 +388,37 @@ def create_manual_summary(text, context):
         elif ".txt" in file_name:
             return f"{{file_name}} 텍스트 파일을 읽습니다. 저장된 정보나 데이터를 확인하여 작업에 필요한 내용을 파악합니다."
         return f"{{file_name}} 파일을 읽습니다. 파일의 내용을 확인하여 필요한 정보를 수집하고 다음 작업을 준비합니다."
-    
+
     elif tool == "Grep":
         pattern = context.get("pattern", "")
         path = context.get("path", "")
         return f"'{{pattern}}' 패턴을 {{path}}에서 검색합니다. 코드베이스 전체에서 특정 함수, 변수, 또는 텍스트의 위치를 찾아 관련 코드를 분석할 수 있도록 준비합니다."
-    
+
     elif tool == "Write":
         file_name = Path(context.get("file_path", "")).name
         return f"{{file_name}} 파일을 생성하거나 덮어씁니다. 새로운 코드나 설정을 작성하여 프로젝트에 필요한 파일을 만들거나 기존 파일을 완전히 재작성합니다."
-    
+
     elif tool == "MultiEdit":
         file_name = Path(context.get("file_path", "")).name
         edits = context.get("edits", [])
         return f"{{file_name}} 파일에 {{len(edits)}}개의 수정 사항을 적용합니다. 여러 부분을 동시에 변경하여 코드를 효율적으로 리팩토링하거나 기능을 개선합니다."
-    
+
     elif tool == "Glob":
         pattern = context.get("pattern", "")
         return f"'{{pattern}}' 패턴으로 파일을 검색합니다. 프로젝트 내에서 특정 유형이나 이름의 파일들을 찾아 작업 대상을 파악합니다."
-    
+
     elif tool == "LS":
         path = context.get("path", "")
         return f"{{path}} 디렉토리의 내용을 나열합니다. 파일과 폴더 구조를 확인하여 프로젝트 구성을 파악합니다."
-    
+
     elif tool == "WebFetch":
         url = context.get("url", "")
         return f"{{url}} 웹 페이지의 내용을 가져옵니다. 온라인 문서나 API 정보를 조회하여 필요한 참고 자료를 수집합니다."
-    
+
     elif tool == "Task":
         description = context.get("description", "")
         return f"작업을 실행합니다: {{description}}. 복잡한 작업을 자동화하거나 여러 단계의 프로세스를 수행합니다."
-    
+
     return text[:200] + "..." if len(text) > 200 else text
 
 def main():
@@ -427,7 +427,7 @@ def main():
     log_file.parent.mkdir(parents=True, exist_ok=True)
     with open(log_file, "a") as f:
         f.write(f"\\n[{{datetime.now()}}] Hook script executed\\n")
-    
+
     # Read hook data from stdin
     try:
         input_data = sys.stdin.read()
@@ -438,15 +438,15 @@ def main():
         with open(log_file, "a") as f:
             f.write(f"Error parsing JSON: {{e}}\\n")
         return
-    
+
     # Extract hook event type
     hook_event = hook_data.get("hook_event_name", "")
-    
+
     # Log the actual hook event for debugging
     with open(log_file, "a") as f:
         f.write(f"Hook event: {{hook_event}}\\n")
         f.write(f"Available keys: {{list(hook_data.keys())}}\\n")
-    
+
     # Create event based on hook type
     event = {{
         "timestamp": datetime.now().isoformat(),
@@ -454,12 +454,12 @@ def main():
         "session_id": hook_data.get("session_id", ""),
         "cwd": hook_data.get("cwd", "")
     }}
-    
+
     # Handle different hook events and prepare content/metadata for sayu
     if hook_event == "PreToolUse":
         tool_name = hook_data.get("tool_name", "")
         tool_input = hook_data.get("tool_input", {{}})
-        
+
         # Format content for sayu with better descriptions
         if tool_name == "Edit":
             file_path = tool_input.get("file_path", "")
@@ -474,19 +474,19 @@ def main():
             content = f"[Pre] {{command}}"
         else:
             content = f"[Pre] {{tool_name}}"
-        
+
         metadata = {{
             "type": "tool_use",
             "tool": tool_name,
             "hook": "PreToolUse",
             "phase": "pre"
         }}
-        
+
     elif hook_event == "PostToolUse":
         tool_name = hook_data.get("tool_name", "")
         tool_input = hook_data.get("tool_input", {{}})
         tool_response = hook_data.get("tool_response", "")
-        
+
         # Create context for summarization
         context = {{
             "tool_name": tool_name,
@@ -495,7 +495,7 @@ def main():
             "old_string": tool_input.get("old_string", ""),
             "new_string": tool_input.get("new_string", ""),
         }}
-        
+
         # Use tool response to get better context
         response_summary = ""
         if tool_response and isinstance(tool_response, str):
@@ -504,110 +504,110 @@ def main():
                 response_summary = summarize_with_gemini(tool_response, "tool", context)
             else:
                 response_summary = tool_response.strip()
-        
+
         # Create informative content based on tool and response
         if tool_name == "Edit":
             file_path = tool_input.get("file_path", "")
             file_name = Path(file_path).name if file_path else "unknown"
             old_str = tool_input.get("old_string", "")
             new_str = tool_input.get("new_string", "")
-            
+
             # Try to understand what was changed
             change_context = ""
             if response_summary:
                 change_context = f" - {{response_summary}}"
             else:
                 change_context = create_manual_summary("", context)
-            
+
             content = f"[수정] {{file_name}}{{change_context}}"
-            
+
         elif tool_name == "Read":
             file_path = tool_input.get("file_path", "")
             file_name = Path(file_path).name if file_path else "unknown"
-            
+
             # Infer purpose from response
             purpose = ""
             if response_summary:
                 purpose = f" - {{response_summary}}"
             else:
                 purpose = " - " + create_manual_summary("", context)
-            
+
             content = f"[읽기] {{file_name}}{{purpose}}"
-            
+
         elif tool_name == "Bash":
             command = tool_input.get("command", "")
             desc = tool_input.get("description", "")
-            
+
             # Use description or summarize command purpose
             if desc:
                 content = f"[실행] {{desc}}"
             else:
                 purpose = create_manual_summary(command, context)
                 content = f"[실행] {{purpose}}"
-            
+
             # Add result summary if available
             if response_summary and "Error" not in response_summary:
                 content += f" → {{response_summary[:100]}}"
-                
+
         elif tool_name == "Grep":
             pattern = tool_input.get("pattern", "")
             path = tool_input.get("path", ".")
-            
+
             # Summarize what was found
             found_info = ""
             if response_summary:
                 found_info = f" → {{response_summary}}"
-            
+
             content = f"[검색] '{{pattern}}' in {{path}}{{found_info}}"
-            
+
         elif tool_name == "Write":
             file_path = tool_input.get("file_path", "")
             file_name = Path(file_path).name if file_path else "unknown"
             content = f"[생성/수정] {{file_name}}"
-            
+
         elif tool_name == "WebFetch":
             url = tool_input.get("url", "")
             prompt = tool_input.get("prompt", "")
-            
+
             content = f"[웹 조회] {{url}}"
             if prompt:
                 content += f" - {{prompt[:50]}}"
-                
+
         elif tool_name == "MultiEdit":
             file_path = tool_input.get("file_path", "")
             file_name = Path(file_path).name if file_path else "unknown"
             edits = tool_input.get("edits", [])
             edit_count = len(edits)
             content = f"[다중 수정] {{file_name}} ({{edit_count}}개 변경)"
-            
+
         elif tool_name == "Glob":
             pattern = tool_input.get("pattern", "")
             path = tool_input.get("path", ".")
             content = f"[파일 검색] '{{pattern}}' in {{path}}"
-            
+
         elif tool_name == "LS":
             path = tool_input.get("path", ".")
             content = f"[디렉토리 목록] {{path}}"
-            
+
         elif tool_name == "Task":
             description = tool_input.get("description", "")
             content = f"[작업 실행] {{description}}"
-            
+
         elif tool_name == "TodoWrite":
             content = "[할 일 목록 업데이트]"
-            
+
         elif tool_name == "NotebookRead" or tool_name == "NotebookEdit":
             notebook_path = tool_input.get("notebook_path", "")
             notebook_name = Path(notebook_path).name if notebook_path else "unknown"
             action = "읽기" if tool_name == "NotebookRead" else "편집"
             content = f"[노트북 {{action}}] {{notebook_name}}"
-            
+
         else:
             # Default formatting with context
             content = f"[{{tool_name}}]"
             if response_summary:
                 content += f" - {{response_summary[:100]}}"
-        
+
         metadata = {{
             "type": "tool_use",
             "tool": tool_name,
@@ -616,27 +616,27 @@ def main():
             "tool_input": tool_input,  # Store original input
             "summarized": response_summary and response_summary != tool_response  # Track if summarized
         }}
-        
+
     elif hook_event == "UserPromptSubmit":
         prompt = hook_data.get("prompt", "")
         # Keep original prompt and also create summary
         original_prompt = prompt
         summary = summarize_with_gemini(prompt, "user")
-        
+
         # Use summary as primary content, but store original in metadata
         content = f"[사용자 요청] {{summary}}"
         metadata = {{
-            "type": "user_request", 
+            "type": "user_request",
             "hook": "UserPromptSubmit",
             "original_text": original_prompt,  # Store full original
             "summarized": summary != original_prompt  # Track if summarized
         }}
-        
+
     elif hook_event == "Stop":
         # Read transcript to get assistant response
         transcript_path = hook_data.get("transcript_path", "")
         content = "[어시스턴트 응답]"
-        
+
         if transcript_path and Path(transcript_path).exists():
             try:
                 with open(transcript_path, "r") as f:
@@ -644,13 +644,13 @@ def main():
                     # Collect all assistant messages from the last exchange
                     assistant_messages = []
                     in_last_exchange = False
-                    
+
                     # Read from end to find the last assistant response(s)
                     for line in reversed(lines):
                         if line.strip():
                             data = json.loads(line)
                             role = data.get("role", "")
-                            
+
                             if role == "assistant" and not in_last_exchange:
                                 in_last_exchange = True
                                 assistant_messages.append(data.get("content", ""))
@@ -659,46 +659,46 @@ def main():
                             elif role == "user" and in_last_exchange:
                                 # Stop when we hit a user message
                                 break
-                    
+
                     # Combine assistant messages and summarize
                     if assistant_messages:
                         combined_text = " ".join(reversed(assistant_messages))
                         summary = summarize_with_gemini(combined_text, "assistant")
                         content = f"[어시스턴트 응답] {{summary}}"
-                    
+
             except Exception as e:
                 with open(log_file, "a") as f:
                     f.write(f"Error reading transcript: {{e}}\\n")
                 content = "[어시스턴트 응답] (읽기 실패)"
-        
+
         metadata = {{"type": "assistant", "hook": "Stop"}}
-        
+
     elif hook_event == "SubagentStop":
         # Similar to Stop but for subagents
         content = "Subagent completed"
         metadata = {{"type": "subagent", "hook": "SubagentStop"}}
-        
+
     elif hook_event == "Notification":
         content = hook_data.get("notification", "")
         metadata = {{"type": "notification", "hook": "Notification"}}
-        
+
     elif hook_event == "PreCompact":
         content = "Compact operation starting"
         metadata = {{"type": "system", "hook": "PreCompact"}}
-        
+
     elif hook_event == "SessionStart":
         content = "Session started"
         metadata = {{"type": "session", "hook": "SessionStart"}}
-        
+
     elif hook_event == "SessionEnd":
-        content = "Session ended"  
+        content = "Session ended"
         metadata = {{"type": "session", "hook": "SessionEnd"}}
-        
+
     else:
         # Unknown event type
         content = f"Unknown event: {{hook_event}}"
         metadata = {{"type": "unknown", "hook": hook_event}}
-    
+
     # Add cwd to metadata for filtering
     metadata["cwd"] = hook_data.get("cwd", "")
 
@@ -708,11 +708,11 @@ def main():
         "content": content,
         "metadata": metadata
     }}
-    
+
     # Append to events file
     event_file = Path("{self.event_file}")
     event_file.parent.mkdir(parents=True, exist_ok=True)
-    
+
     with open(event_file, "a") as f:
         f.write(json.dumps(sayu_event) + "\\n")
 
